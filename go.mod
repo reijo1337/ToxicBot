@@ -1,4 +1,4 @@
-// +heroku install ./cmd/main.go
+// +heroku install cmd/main.go
 module github.com/reijo1337/ToxicBot
 
 go 1.17
