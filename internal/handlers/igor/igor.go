@@ -45,7 +45,7 @@ func (i *Igor) Handler(message *tgbotapi.Message) (tgbotapi.Chattable, error) {
 		return nil, nil
 	}
 
-	if i.r.Intn(2) != 0 {
+	if i.r.Intn(10000) != 0 {
 		return nil, nil
 	}
 
