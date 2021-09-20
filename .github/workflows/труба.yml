@@ -33,6 +33,11 @@ jobs:
       with:
         name: go-binary
         path: bot
-    
-    - name: Build Docker
-      run: docker build . --file Dockerfile --tag toxic-bot:$(date +%s)
+  
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download a single artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: go-binary
