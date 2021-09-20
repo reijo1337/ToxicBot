@@ -11,6 +11,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    - name: Intro
+      run: echo "Эту трубу я посвещаю своему другу девпопсеру, любителю клопов и змей"
+
     - name: Checkout repository
       uses: actions/checkout@v2
 
@@ -30,3 +33,6 @@ jobs:
       with:
         name: go-binary
         path: bot
+    
+    - name: Build Docker
+      run: docker build . --file Dockerfile --tag toxic-bot:$(date +%s)
