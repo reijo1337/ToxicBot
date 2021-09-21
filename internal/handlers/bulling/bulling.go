@@ -83,7 +83,9 @@ func (b *Bulling) Handler(message *tgbotapi.Message) (tgbotapi.Chattable, error)
 	b.log.Infof("bulling %s; check time list; start len %d", key, b.msgCount[key].Len())
 
 	// Удаляем инфу, старше порога времени из конфига
-	for e := b.msgCount[key].Front(); e != nil; e = e.Next() {
+	var next *list.Element
+	for e := b.msgCount[key].Front(); e != nil; e = next {
+		next = e.Next()
 		t := e.Value.(time.Time)
 
 		if now.Sub(t) > b.cfg.ThresholdTime {
