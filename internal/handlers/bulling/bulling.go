@@ -10,10 +10,12 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/sirupsen/logrus"
 )
 
 type Bulling struct {
 	cfg      config
+	log      *logrus.Logger
 	messages []string
 	r        *rand.Rand
 
@@ -24,11 +26,12 @@ type Bulling struct {
 	muCooldown sync.Mutex
 }
 
-func New() (*Bulling, error) {
+func New(log *logrus.Logger) (*Bulling, error) {
 	out := Bulling{
 		r:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		msgCount: make(map[string]*list.List),
 		cooldown: make(map[string]time.Time),
+		log:      log,
 	}
 
 	if err := out.parseConfig(); err != nil {
@@ -60,6 +63,8 @@ func (b *Bulling) Handler(message *tgbotapi.Message) (tgbotapi.Chattable, error)
 
 	now := time.Now()
 	key := fmt.Sprintf("%d:%d", message.Chat.ID, message.From.ID)
+
+	b.log.Infof("bulling; message %+v; key %s", message, key)
 
 	// Уже булили, надо подождать
 	if b.isCooldown(key) {

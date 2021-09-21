@@ -27,7 +27,7 @@ func main() {
 		logger.WithError(err).Fatal("init igor handler")
 	}
 
-	bullingHandler, err := bulling.New()
+	bullingHandler, err := bulling.New(logger)
 	if err != nil {
 		logger.WithError(err).Fatal("init bulling handler")
 	}
@@ -43,7 +43,7 @@ func main() {
 func newLogger() *logrus.Logger {
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.JSONFormatter{})
+	logger.SetFormatter(&logrus.TextFormatter{})
 	logger.SetReportCaller(true)
 
 	return logger
