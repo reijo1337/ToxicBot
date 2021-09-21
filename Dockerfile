@@ -1,4 +1,4 @@
 FROM alpine:3.13
 
-COPY go-binary bot
+COPY bot bot
 CMD "./bot"
