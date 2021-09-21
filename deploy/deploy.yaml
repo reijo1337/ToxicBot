@@ -1,0 +1,14 @@
+---
+
+- name: Deploy bot
+
+  become: yes
+  become_user: root
+  hosts: vscale_host
+  tasks:
+    - name: Create and start a container
+      community.docker.docker_container:
+        name: "ToxicBot"
+        image: "docker.io/32133789756/toxicbot:latest"
+        state: started
+        recreate: yes
