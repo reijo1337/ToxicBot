@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Intro
-      run: echo "Эту трубу я посвещаю своему другу девпопсеру, любителю клопов и змей"
+      run: echo "Эту трубу я посвящаю своему другу девпопсеру, любителю клопов и змей"
 
     - name: Checkout repository
       uses: actions/checkout@v2
