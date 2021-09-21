@@ -75,9 +75,10 @@ jobs:
     steps:
     - name: deploy to vscale server using ansible
       uses: dawidd6/action-ansible-playbook@v2
-      playbook: deploy.yaml
-      directory: deploy/
-      key: ${{secrets.SSH_PRIVATE_KEY}}
-      inventory: |
-      [vscale_host]
-      vscale ansible_host=37.228.116.131 ansible_user=root
+      with:
+        playbook: deploy.yaml
+        directory: deploy/
+        key: ${{secrets.SSH_PRIVATE_KEY}}
+        inventory: |
+          [vscale_host]
+          vscale ansible_host=37.228.116.131 ansible_user=root
