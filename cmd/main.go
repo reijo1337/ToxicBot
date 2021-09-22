@@ -27,7 +27,7 @@ func main() {
 		logger.WithError(err).Fatal("init igor handler")
 	}
 
-	bullingHandler, err := bulling.New(logger)
+	bullingHandler, err := bulling.New()
 	if err != nil {
 		logger.WithError(err).Fatal("init bulling handler")
 	}
