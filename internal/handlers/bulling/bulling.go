@@ -10,10 +10,12 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/sirupsen/logrus"
 )
 
 type Bulling struct {
 	cfg      config
+	log      *logrus.Logger
 	messages []string
 	r        *rand.Rand
 
@@ -24,11 +26,12 @@ type Bulling struct {
 	muCooldown sync.Mutex
 }
 
-func New() (*Bulling, error) {
+func New(log *logrus.Logger) (*Bulling, error) {
 	out := Bulling{
 		r:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		msgCount: make(map[string]*list.List),
 		cooldown: make(map[string]time.Time),
+		log:      log,
 	}
 
 	if err := out.parseConfig(); err != nil {
@@ -61,6 +64,8 @@ func (b *Bulling) Handler(message *tgbotapi.Message) (tgbotapi.Chattable, error)
 	now := time.Now()
 	key := fmt.Sprintf("%d:%d", message.Chat.ID, message.From.ID)
 
+	b.log.Infof("bulling; message from %+v; key %s", *message.From, key)
+
 	// Уже булили, надо подождать
 	if b.isCooldown(key) {
 		return nil, nil
@@ -75,14 +80,21 @@ func (b *Bulling) Handler(message *tgbotapi.Message) (tgbotapi.Chattable, error)
 	}
 	b.msgCount[key].PushBack(message.Time())
 
+	b.log.Infof("bulling %s; check time list; start len %d", key, b.msgCount[key].Len())
+
 	// Удаляем инфу, старше порога времени из конфига
-	for e := b.msgCount[key].Front(); e != nil; e = e.Next() {
+	var next *list.Element
+	for e := b.msgCount[key].Front(); e != nil; e = next {
+		next = e.Next()
 		t := e.Value.(time.Time)
 
 		if now.Sub(t) > b.cfg.ThresholdTime {
 			b.msgCount[key].Remove(e)
+			b.log.Infof("bulling %s; check time list; remove time %s; now len %d", key, t, b.msgCount[key].Len())
 		}
 	}
+
+	b.log.Infof("bulling %s; check time list; final len %d", key, b.msgCount[key].Len())
 
 	// Булим
 	if b.msgCount[key].Len() >= b.cfg.ThresholdCount {
@@ -105,16 +117,21 @@ func (b *Bulling) isCooldown(key string) bool {
 	b.muCooldown.Lock()
 	defer b.muCooldown.Unlock()
 
+	b.log.Infof("is cooldown %s", key)
+
 	t, ok := b.cooldown[key]
 	if !ok {
+		b.log.Infof("is cooldown %s; has no key", key)
 		return false
 	}
 
 	if time.Now().After(t) {
+		b.log.Infof("is cooldown %s; has expired key", key)
 		delete(b.cooldown, key)
 		return false
 	}
 
+	b.log.Infof("is cooldown %s; has actual key", key)
 	return true
 }
 
