@@ -13,6 +13,12 @@
         pull: yes
         state: started
         recreate: yes
+        env:
+          TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
+          BULLINGS_FILE: "{{ BULLINGS_FILE }}"
+          GREETINGS_PATH: "{{ GREETINGS_PATH }}"
+          IGOR_FILE_PATH: "{{ IGOR_FILE_PATH }}"
+          IGOR_ID: "{{ IGOR_ID }}"
 
     - name: Prune unused imagages
       community.docker.docker_prune:
