@@ -10,6 +10,6 @@
       community.docker.docker_container:
         name: "ToxicBot"
         image: "docker.io/32133789756/toxicbot:latest"
-        poll: yes
+        pull: yes
         state: started
         recreate: yes
