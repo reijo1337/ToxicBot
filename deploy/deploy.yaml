@@ -13,3 +13,9 @@
         pull: yes
         state: started
         recreate: yes
+
+    - name: Prune unused imagages
+      community.docker.docker_prune:
+        images: yes
+        images_filters:
+          dangling: yes
