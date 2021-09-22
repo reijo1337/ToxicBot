@@ -86,3 +86,9 @@ jobs:
         inventory: |
           [vscale_host]
           vscale ansible_host=37.228.116.131 ansible_user=root
+        options: |
+          --extra-vars TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} 
+          BULLINGS_FILE=data/random
+          GREETINGS_PATH=data/greetings 
+          IGOR_FILE_PATH=data/igor 
+          IGOR_ID=${{ secrets.IGOR_ID }}
