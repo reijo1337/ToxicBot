@@ -1,0 +1,27 @@
+---
+
+- name: Deploy bot
+
+  become: yes
+  become_user: root
+  hosts: vscale_host
+  tasks:
+    - name: Create and start a container
+      community.docker.docker_container:
+        name: "ToxicBot"
+        image: "docker.io/32133789756/toxicbot:latest"
+        pull: yes
+        state: started
+        recreate: yes
+        env:
+          TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
+          BULLINGS_FILE: "{{ BULLINGS_FILE }}"
+          GREETINGS_PATH: "{{ GREETINGS_PATH }}"
+          IGOR_FILE_PATH: "{{ IGOR_FILE_PATH }}"
+          IGOR_ID: "{{ IGOR_ID }}"
+
+    - name: Prune unused imagages
+      community.docker.docker_prune:
+        images: yes
+        images_filters:
+          dangling: yes
