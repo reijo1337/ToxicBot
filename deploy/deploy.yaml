@@ -13,6 +13,8 @@
         pull: yes
         state: started
         recreate: yes
+        restart_policy: always
+        restart_retries: 3
         env:
           TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
           BULLINGS_FILE: "{{ BULLINGS_FILE }}"
