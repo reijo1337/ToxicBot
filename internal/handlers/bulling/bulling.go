@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mb-14/gomarkov"
 )
 
 type Bulling struct {
@@ -22,6 +24,8 @@ type Bulling struct {
 
 	cooldown   map[string]time.Time
 	muCooldown sync.Mutex
+
+	chain *gomarkov.Chain
 }
 
 func New() (*Bulling, error) {
@@ -29,6 +33,7 @@ func New() (*Bulling, error) {
 		r:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		msgCount: make(map[string]*list.List),
 		cooldown: make(map[string]time.Time),
+		chain:    gomarkov.NewChain(1),
 	}
 
 	if err := out.parseConfig(); err != nil {
@@ -43,7 +48,9 @@ func New() (*Bulling, error) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		out.messages = append(out.messages, scanner.Text())
+		text := scanner.Text()
+		out.chain.Add(strings.Split(strings.Trim(text, " "), " "))
+		out.messages = append(out.messages, text)
 	}
 
 	if scanner.Err() != nil {
@@ -91,8 +98,7 @@ func (b *Bulling) Handler(message *tgbotapi.Message) (tgbotapi.Chattable, error)
 		// КД на булинг
 		b.setCooldown(key)
 
-		randomIndex := b.r.Intn(len(b.messages))
-		text := b.messages[randomIndex]
+		text := b.getMessageText()
 
 		msg := tgbotapi.NewMessage(message.Chat.ID, text)
 		msg.ReplyToMessageID = message.MessageID
@@ -124,4 +130,28 @@ func (b *Bulling) setCooldown(key string) {
 	b.muCooldown.Lock()
 	b.cooldown[key] = time.Now().Add(b.cfg.Cooldown)
 	b.muCooldown.Unlock()
+}
+
+func (b *Bulling) getMessageText() string {
+	if b.r.Float32() <= b.cfg.MarkovChance {
+		text, err := b.generateDegenerate()
+		if err == nil {
+			return text
+		}
+	}
+
+	randomIndex := b.r.Intn(len(b.messages))
+	return b.messages[randomIndex]
+}
+
+func (b *Bulling) generateDegenerate() (string, error) {
+	tokens := []string{gomarkov.StartToken}
+	for tokens[len(tokens)-1] != gomarkov.EndToken {
+		next, err := b.chain.Generate(tokens[(len(tokens) - 1):])
+		if err != nil {
+			return "", fmt.Errorf("can't generate next token: %w", err)
+		}
+		tokens = append(tokens, next)
+	}
+	return strings.Join(tokens[1:len(tokens)-1], " "), nil
 }

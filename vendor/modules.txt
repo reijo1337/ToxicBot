@@ -4,6 +4,9 @@ github.com/go-telegram-bot-api/telegram-bot-api
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
+# github.com/mb-14/gomarkov v0.0.0-20210216094942-a5b484cc0243
+## explicit; go 1.14
+github.com/mb-14/gomarkov
 # github.com/sirupsen/logrus v1.8.1
 ## explicit; go 1.13
 github.com/sirupsen/logrus
