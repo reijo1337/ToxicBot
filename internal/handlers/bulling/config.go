@@ -11,7 +11,7 @@ type config struct {
 	ThresholdCount int           `envconfig:"BULLINGS_THRESHOLD_COUNT" default:"5"`
 	ThresholdTime  time.Duration `envconfig:"BULLINGS_THRESHOLD_TIME" default:"1m"`
 	Cooldown       time.Duration `envconfig:"BULLINGS_COOLDOWN" default:"1h"`
-	MarkovChance   float32       `envconfig:"BULLINGS_MARKOV_CAHNCE" default:"0.75"`
+	MarkovChance   float32       `envconfig:"BULLINGS_MARKOV_CAHNCE" default:"0.5"`
 }
 
 func (b *Bulling) parseConfig() error {
