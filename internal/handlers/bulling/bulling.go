@@ -1,11 +1,10 @@
 package bulling
 
 import (
-	"bufio"
 	"container/list"
 	"fmt"
+	"github.com/reijo1337/ToxicBot/internal/utils"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -40,21 +39,15 @@ func New() (*Bulling, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	file, err := os.Open(out.cfg.FilePath)
+	messages, err := utils.ReadFile(out.cfg.FilePath)
 	if err != nil {
-		return nil, fmt.Errorf("open file: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		text := scanner.Text()
-		out.chain.Add(strings.Split(strings.Trim(text, " "), " "))
-		out.messages = append(out.messages, text)
+		return nil, err
 	}
 
-	if scanner.Err() != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
+	out.messages = messages
+
+	for _, message := range out.messages {
+		out.chain.Add(strings.Split(strings.Trim(message, " "), " "))
 	}
 
 	return &out, nil
