@@ -39,15 +39,16 @@ func New() (*Bulling, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	err := utils.ReadFile(out.cfg.FilePath, &out.messages)
+	messages, err := utils.ReadFile(out.cfg.FilePath)
 	if err != nil {
 		return nil, err
 	}
 
+	out.messages = messages
+
 	for _, message := range out.messages {
 		out.chain.Add(strings.Split(strings.Trim(message, " "), " "))
 	}
-
 
 	return &out, nil
 }

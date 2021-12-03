@@ -6,25 +6,26 @@ import (
 	"os"
 )
 
-func ReadFile(filePath string, list *[]string) error {
+func ReadFile(filePath string) ([]string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return nil, fmt.Errorf("open file: %w", err)
 	}
 	defer file.Close()
 
+	result := []string{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
 			continue
 		}
-		*list = append(*list, line)
+		result = append(result, line)
 	}
 
 	if scanner.Err() != nil {
-		return fmt.Errorf("reading file: %w", err)
+		return nil, fmt.Errorf("reading file: %w", err)
 	}
 
-	return nil
+	return result, nil
 }

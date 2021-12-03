@@ -23,11 +23,12 @@ func New() (*Greetings, error) {
 
 	path := os.Getenv(filePathEnv)
 
-	err := utils.ReadFile(path, &out.messages)
+	messages, err := utils.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
+	out.messages = messages
 	return &out, nil
 }
 
