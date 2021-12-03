@@ -1,8 +1,7 @@
 package greetings
 
 import (
-	"bufio"
-	"fmt"
+	"github.com/reijo1337/ToxicBot/internal/utils"
 	"math/rand"
 	"os"
 	"time"
@@ -18,25 +17,15 @@ type Greetings struct {
 }
 
 func New() (*Greetings, error) {
-	path := os.Getenv(filePathEnv)
-
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open file: %w", err)
-	}
-	defer file.Close()
-
 	out := Greetings{
 		r: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		out.messages = append(out.messages, scanner.Text())
-	}
+	path := os.Getenv(filePathEnv)
 
-	if scanner.Err() != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
+	err := utils.ReadFile(path, &out.messages)
+	if err != nil {
+		return nil, err
 	}
 
 	return &out, nil
