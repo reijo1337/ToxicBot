@@ -3,6 +3,7 @@
 Telegram-бот, который будет вас булить в вашем собственном чате.
 
 [![Труба Actions Status](https://github.com/reijo1337/ToxicBot/workflows/Труба/badge.svg)](https://github.com/reijo1337/ToxicBot/actions)
+
 ## Env
 
 * `TELEGRAM_TOKEN` - токен telegram-бота. Обязателен.
