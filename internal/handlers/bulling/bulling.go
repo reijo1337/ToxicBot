@@ -3,11 +3,12 @@ package bulling
 import (
 	"container/list"
 	"fmt"
-	"github.com/reijo1337/ToxicBot/internal/utils"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/reijo1337/ToxicBot/internal/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/mb-14/gomarkov"

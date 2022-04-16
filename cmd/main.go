@@ -6,6 +6,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/greetings"
 	"github.com/reijo1337/ToxicBot/internal/handlers/igor"
 	"github.com/reijo1337/ToxicBot/internal/handlers/leave"
+	"github.com/reijo1337/ToxicBot/internal/handlers/sticker_reactions"
 
 	"github.com/sirupsen/logrus"
 )
@@ -32,10 +33,16 @@ func main() {
 		logger.WithError(err).Fatal("init bulling handler")
 	}
 
+	stickersReactionHandler, err := sticker_reactions.New()
+	if err != nil {
+		logger.WithError(err).Fatal("init sticker reactions")
+	}
+
 	a.RegisterHandler(greetingsHandler.Handler)
 	a.RegisterHandler(leave.Handler)
 	a.RegisterHandler(igorHandler.Handler)
 	a.RegisterHandler(bullingHandler.Handler)
+	a.RegisterHandler(stickersReactionHandler.Handler)
 
 	a.Run()
 }
