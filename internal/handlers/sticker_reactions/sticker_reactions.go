@@ -39,10 +39,6 @@ func (sr *StickerReactions) Handler(message *tgbotapi.Message) (tgbotapi.Chattab
 		return nil, nil
 	}
 
-	// for development purposes
-	// uncomment to know sticker file id
-	// fmt.Println(message.Sticker.FileID)
-
 	if sr.r.Float32() > sr.cfg.ReactChance {
 		return nil, nil
 	}
