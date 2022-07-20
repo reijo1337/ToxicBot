@@ -1,50 +1,102 @@
 package main
 
 import (
-	"github.com/reijo1337/ToxicBot/internal/app"
-	"github.com/reijo1337/ToxicBot/internal/handlers/bulling"
-	"github.com/reijo1337/ToxicBot/internal/handlers/greetings"
-	"github.com/reijo1337/ToxicBot/internal/handlers/igor"
-	"github.com/reijo1337/ToxicBot/internal/handlers/leave"
-	"github.com/reijo1337/ToxicBot/internal/handlers/sticker_reactions"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/kelseyhightower/envconfig"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_sticker"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/bulling"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/igor"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_join"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
+	"gopkg.in/telebot.v3"
 
 	"github.com/sirupsen/logrus"
 )
 
+type config struct {
+	TelegramToken           string        `envconfig:"TELEGRAM_TOKEN" required:"true"`
+	TelegramLongPollTimeout time.Duration `envconfig:"TELEGRAM_LONG_POLL_TIMEOUT" default:"10s"`
+}
+
 func main() {
 	logger := newLogger()
-	a, err := app.New(app.WithLogger(logger))
+
+	cfg, err := newConfig()
 	if err != nil {
-		logger.WithError(err).Fatal("init application")
+		logger.WithError(err).Fatal("can't init config")
 	}
 
-	greetingsHandler, err := greetings.New()
+	pref := telebot.Settings{
+		Token:  cfg.TelegramToken,
+		Poller: &telebot.LongPoller{Timeout: cfg.TelegramLongPollTimeout},
+		OnError: func(err error, ctx telebot.Context) {
+			logger.
+				WithError(err).
+				WithField("update", ctx.Update()).
+				Error("can't handle update")
+		},
+	}
+
+	b, err := telebot.NewBot(pref)
 	if err != nil {
-		logger.WithError(err).Fatal("init greetings handler")
+		logger.WithError(err).Fatal("can't init bot api")
 	}
 
 	igorHandler, err := igor.New()
 	if err != nil {
-		logger.WithError(err).Fatal("init igor handler")
+		logger.WithError(err).Fatal("init on_text igor handler")
 	}
 
 	bullingHandler, err := bulling.New()
 	if err != nil {
-		logger.WithError(err).Fatal("init bulling handler")
+		logger.WithError(err).Fatal("init on_text bulling handler")
 	}
 
-	stickersReactionHandler, err := sticker_reactions.New()
+	b.Handle(
+		telebot.OnText,
+		on_text.New(
+			igorHandler,
+			bullingHandler,
+		).Handle,
+	)
+
+	greetingsHandler, err := on_user_join.New()
 	if err != nil {
-		logger.WithError(err).Fatal("init sticker reactions")
+		logger.WithError(err).Fatal("init on_user_join handler")
+	}
+	b.Handle(telebot.OnUserJoined, greetingsHandler.Handle)
+
+	b.Handle(telebot.OnUserLeft, on_user_left.Handle)
+
+	stickersReactionHandler, err := on_sticker.New()
+	if err != nil {
+		logger.WithError(err).Fatal("init on_sticker handler")
 	}
 
-	a.RegisterHandler(greetingsHandler.Handler)
-	a.RegisterHandler(leave.Handler)
-	a.RegisterHandler(igorHandler.Handler)
-	a.RegisterHandler(bullingHandler.Handler)
-	a.RegisterHandler(stickersReactionHandler.Handler)
+	b.Handle(telebot.OnSticker, stickersReactionHandler.Handle)
 
-	a.Run()
+	onVoice, err := on_voice.New()
+	if err != nil {
+		logger.WithError(err).Fatal("can't init on_voice handler")
+	}
+	b.Handle(telebot.OnVoice, onVoice.Handle)
+
+	go func() {
+		logger.WithField("user_name", b.Me.Username).Info("bot started")
+		b.Start()
+	}()
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	<-done
+	b.Stop()
 }
 
 func newLogger() *logrus.Logger {
@@ -54,4 +106,14 @@ func newLogger() *logrus.Logger {
 	logger.SetReportCaller(true)
 
 	return logger
+}
+
+func newConfig() (*config, error) {
+	var cfg config
+	if err := envconfig.Process("", &cfg); err != nil {
+		envconfig.Usage("", cfg)
+		return nil, err
+	}
+
+	return &cfg, nil
 }

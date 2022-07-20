@@ -4,13 +4,10 @@ module github.com/reijo1337/ToxicBot
 go 1.17
 
 require (
-	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mb-14/gomarkov v0.0.0-20210216094942-a5b484cc0243
 	github.com/sirupsen/logrus v1.8.1
+	gopkg.in/telebot.v3 v3.0.0
 )
 
-require (
-	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
-	golang.org/x/sys v0.0.0-20191026070338-33540a1f6037 // indirect
-)
+require golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
