@@ -42,5 +42,9 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	randomIndex := h.r.Intn(len(h.stickers))
 	voice := h.stickers[randomIndex]
 
+	if err := ctx.Notify(telebot.RecordingAudio); err != nil {
+		return err
+	}
+	time.Sleep(time.Duration(h.r.Intn(15) * 1_000_000_000))
 	return ctx.Reply(&telebot.Voice{File: telebot.File{FileID: voice}})
 }
