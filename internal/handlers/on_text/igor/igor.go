@@ -55,7 +55,5 @@ func (i *igor) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
-	ctx.Reply(i.text)
-
-	return nil
+	return ctx.Reply(i.text)
 }

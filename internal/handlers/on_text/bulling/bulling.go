@@ -101,9 +101,12 @@ func (b *bulling) Handle(ctx telebot.Context) error {
 
 		text := b.getMessageText()
 
-		ctx.Reply(text)
+		if err := ctx.Notify(telebot.Typing); err != nil {
+			return err
+		}
+		time.Sleep(time.Duration((float64(b.r.Intn(3)) + b.r.Float64()) * 1_000_000_000))
 
-		return nil
+		return ctx.Reply(text)
 	}
 
 	return nil
