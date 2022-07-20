@@ -6,7 +6,7 @@ import (
 
 type config struct {
 	FilePath    string  `envconfig:"VOICE_FILE" default:"data/voice"`
-	ReactChance float32 `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.25"`
+	ReactChance float32 `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.4"`
 }
 
 func (h *Handler) parseConfig() error {
