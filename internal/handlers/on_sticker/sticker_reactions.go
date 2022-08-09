@@ -15,7 +15,7 @@ type StickerReactions struct {
 	r        *rand.Rand
 }
 
-func New() (*StickerReactions, error) {
+func New(stickersFromPacks []string) (*StickerReactions, error) {
 	out := StickerReactions{
 		r: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -29,6 +29,7 @@ func New() (*StickerReactions, error) {
 		return nil, err
 	}
 
+	stickers = append(stickers, stickersFromPacks...)
 	out.stickers = stickers
 
 	return &out, nil
