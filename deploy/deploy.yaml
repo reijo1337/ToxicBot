@@ -20,6 +20,7 @@
           GREETINGS_PATH: "{{ GREETINGS_PATH }}"
           IGOR_FILE_PATH: "{{ IGOR_FILE_PATH }}"
           IGOR_ID: "{{ IGOR_ID }}"
+          STICKER_SETS: "{{ STICKER_SETS }}"
 
     - name: Prune unused imagages
       community.docker.docker_prune:
