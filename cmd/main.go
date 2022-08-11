@@ -80,7 +80,7 @@ func main() {
 	if len(cfg.StickerSets) > 0 {
 		stickersFromPacks, err = utils.GetStickersFromPacks(b, cfg.StickerSets)
 		if err != nil {
-			logger.Warn("can't get stickers from sticker packs because of error: ", err)
+			logger.WithError(err).Warn("can't get stickers from sticker packs")
 		}
 	}
 
