@@ -14,7 +14,6 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_join"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
-	"github.com/reijo1337/ToxicBot/internal/utils"
 	"gopkg.in/telebot.v3"
 
 	"github.com/sirupsen/logrus"
@@ -24,6 +23,7 @@ type config struct {
 	TelegramToken           string        `envconfig:"TELEGRAM_TOKEN" required:"true"`
 	TelegramLongPollTimeout time.Duration `envconfig:"TELEGRAM_LONG_POLL_TIMEOUT" default:"10s"`
 	StickerSets             []string      `envconfig:"STICKER_SETS" default:"static_bulling_by_stickersthiefbot"`
+	StickersUpdateInterval	time.Duration `envconfig:"STICKERS_UPDATE_INTERVAL" default:"600s"`
 }
 
 func main() {
@@ -76,15 +76,7 @@ func main() {
 
 	b.Handle(telebot.OnUserLeft, on_user_left.Handle)
 
-	stickersFromPacks := []string{}
-	if len(cfg.StickerSets) > 0 {
-		stickersFromPacks, err = utils.GetStickersFromPacks(b, cfg.StickerSets)
-		if err != nil {
-			logger.WithError(err).Warn("can't get stickers from sticker packs")
-		}
-	}
-
-	stickersReactionHandler, err := on_sticker.New(stickersFromPacks)
+	stickersReactionHandler, err := on_sticker.New(b, cfg.StickerSets, logger)
 	if err != nil {
 		logger.WithError(err).Fatal("can't init on_sticker handler")
 	}
@@ -102,10 +94,28 @@ func main() {
 		b.Start()
 	}()
 
+	stickersUpdateDone := make(chan struct{})
+	ticker := time.NewTicker(cfg.StickersUpdateInterval)
+	go func() {
+		for {
+			select {
+			case <-stickersUpdateDone:
+				return
+			case <-ticker.C:
+				err = stickersReactionHandler.UpdateStickersFromPacks(b)
+				if err != nil {
+					logger.WithError(err).Warn("can't get stickers from sticker packs")
+				}
+			}
+		}
+	}()
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	<-done
+	stickersUpdateDone <- struct{}{}
+	ticker.Stop()
 	b.Stop()
 }
 
