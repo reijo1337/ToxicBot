@@ -2,11 +2,12 @@ package on_sticker
 
 import (
 	"github.com/kelseyhightower/envconfig"
+	"time"
 )
 
 type config struct {
-	FilePath    string  `envconfig:"STICKERS_FILE" default:"data/stickers"`
-	ReactChance float32 `envconfig:"STICKER_REACTIONS_CHANCE" default:"0.4"`
+	ReactChance          float32       `envconfig:"STICKER_REACTIONS_CHANCE" default:"0.4"`
+	UpdateStickersPeriod time.Duration `envconfig:"STICKERS_UPDATE_PERIOD" default:"30m"`
 }
 
 func (sr *StickerReactions) parseConfig() error {

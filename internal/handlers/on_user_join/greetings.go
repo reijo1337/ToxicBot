@@ -1,34 +1,46 @@
 package on_user_join
 
 import (
+	"context"
+	"fmt"
+	"github.com/reijo1337/ToxicBot/internal/storage"
+	"github.com/sirupsen/logrus"
 	"math/rand"
-	"os"
+	"sync"
 	"time"
 
-	"github.com/reijo1337/ToxicBot/internal/utils"
 	"gopkg.in/telebot.v3"
 )
 
-const filePathEnv = "GREETINGS_PATH"
-
 type Greetings struct {
+	cfg config
+
+	storage storage.Manager
+	logger  *logrus.Logger
+
 	messages []string
-	r        *rand.Rand
+	muMsg    sync.RWMutex
+
+	r *rand.Rand
 }
 
-func New() (*Greetings, error) {
+func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Greetings, error) {
 	out := Greetings{
-		r: rand.New(rand.NewSource(time.Now().UnixNano())),
+		storage: stor,
+		logger:  logger,
+		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
-	path := os.Getenv(filePathEnv)
-
-	messages, err := utils.ReadFile(path)
-	if err != nil {
-		return nil, err
+	if err := out.parseConfig(); err != nil {
+		return nil, fmt.Errorf("cannot parse config: %w", err)
 	}
 
-	out.messages = messages
+	if err := out.reloadMessages(); err != nil {
+		return nil, fmt.Errorf("cannot load messages: %w", err)
+	}
+
+	go out.runUpdater(ctx)
+
 	return &out, nil
 }
 

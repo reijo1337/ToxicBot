@@ -2,35 +2,42 @@ package bulling
 
 import (
 	"container/list"
+	"context"
 	"fmt"
+	"github.com/reijo1337/ToxicBot/internal/storage"
+	"github.com/sirupsen/logrus"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
-	"github.com/reijo1337/ToxicBot/internal/utils"
 	"gopkg.in/telebot.v3"
 
 	"github.com/mb-14/gomarkov"
 )
 
 type bulling struct {
-	cfg      config
+	storage storage.Manager
+	logger  *logrus.Logger
+	cfg     config
+	r       *rand.Rand
+
 	messages []string
-	r        *rand.Rand
+	chain    *gomarkov.Chain
+	muMsg    sync.RWMutex
 
 	msgCount map[string]*list.List
 	muCount  sync.Mutex
 
 	cooldown   map[string]time.Time
 	muCooldown sync.Mutex
-
-	chain *gomarkov.Chain
 }
 
-func New() (on_text.SubHandler, error) {
+func New(ctx context.Context, s storage.Manager, logger *logrus.Logger) (on_text.SubHandler, error) {
 	out := bulling{
+		storage:  s,
+		logger:   logger,
 		r:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		msgCount: make(map[string]*list.List),
 		cooldown: make(map[string]time.Time),
@@ -41,16 +48,11 @@ func New() (on_text.SubHandler, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	messages, err := utils.ReadFile(out.cfg.FilePath)
-	if err != nil {
-		return nil, err
+	if err := out.reloadMessages(); err != nil {
+		return nil, fmt.Errorf("cannot load messages: %w", err)
 	}
 
-	out.messages = messages
-
-	for _, message := range out.messages {
-		out.chain.Add(strings.Split(strings.Trim(message, " "), " "))
-	}
+	go out.runUpdater(ctx)
 
 	return &out, nil
 }
@@ -143,11 +145,15 @@ func (b *bulling) getMessageText() string {
 		}
 	}
 
+	b.muMsg.RLock()
+	defer b.muMsg.RUnlock()
 	randomIndex := b.r.Intn(len(b.messages))
 	return b.messages[randomIndex]
 }
 
 func (b *bulling) generateDegenerate() (string, error) {
+	b.muMsg.RLock()
+	defer b.muMsg.RUnlock()
 	tokens := []string{gomarkov.StartToken}
 	for tokens[len(tokens)-1] != gomarkov.EndToken {
 		next, err := b.chain.Generate(tokens[(len(tokens) - 1):])

@@ -1,35 +1,44 @@
 package on_voice
 
 import (
+	"context"
 	"fmt"
+	"github.com/reijo1337/ToxicBot/internal/storage"
+	"github.com/sirupsen/logrus"
 	"math/rand"
+	"sync"
 	"time"
 
-	"github.com/reijo1337/ToxicBot/internal/utils"
 	"gopkg.in/telebot.v3"
 )
 
 type Handler struct {
-	cfg      config
-	stickers []string
-	r        *rand.Rand
+	cfg config
+
+	voices []string
+	muVcs  sync.RWMutex
+
+	r       *rand.Rand
+	storage storage.Manager
+	logger  *logrus.Logger
 }
 
-func New() (*Handler, error) {
+func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Handler, error) {
 	out := Handler{
-		r: rand.New(rand.NewSource(time.Now().UnixNano())),
+		storage: stor,
+		logger:  logger,
+		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	if err := out.parseConfig(); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	stickers, err := utils.ReadFile(out.cfg.FilePath)
-	if err != nil {
-		return nil, err
+	if err := out.reloadVoices(); err != nil {
+		return nil, fmt.Errorf("cannot load voices: %w", err)
 	}
 
-	out.stickers = stickers
+	go out.runUpdater(ctx)
 
 	return &out, nil
 }
@@ -39,8 +48,10 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
-	randomIndex := h.r.Intn(len(h.stickers))
-	voice := h.stickers[randomIndex]
+	h.muVcs.RLock()
+	defer h.muVcs.RUnlock()
+	randomIndex := h.r.Intn(len(h.voices))
+	voice := h.voices[randomIndex]
 
 	if err := ctx.Notify(telebot.RecordingAudio); err != nil {
 		return err

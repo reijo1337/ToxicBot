@@ -2,11 +2,12 @@ package on_voice
 
 import (
 	"github.com/kelseyhightower/envconfig"
+	"time"
 )
 
 type config struct {
-	FilePath    string  `envconfig:"VOICE_FILE" default:"data/voice"`
-	ReactChance float32 `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.4"`
+	ReactChance        float32       `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.4"`
+	UpdateVoicesPeriod time.Duration `envconfig:"VOICE_UPDATE_PERIOD" default:"30m"`
 }
 
 func (h *Handler) parseConfig() error {

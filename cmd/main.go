@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"github.com/reijo1337/ToxicBot/internal/google_spreadsheet"
+	"github.com/reijo1337/ToxicBot/internal/storage"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,12 +30,21 @@ type config struct {
 }
 
 func main() {
+	ctx := context.Background()
+
 	logger := newLogger()
 
 	cfg, err := newConfig()
 	if err != nil {
 		logger.WithError(err).Fatal("can't init config")
 	}
+
+	gs, err := google_spreadsheet.New(ctx)
+	if err != nil {
+		logger.WithError(err).Fatal("can't create google spreadsheet instance")
+	}
+
+	stor := storage.New(gs)
 
 	pref := telebot.Settings{
 		Token:  cfg.TelegramToken,
@@ -50,12 +62,12 @@ func main() {
 		logger.WithError(err).Fatal("can't init bot api")
 	}
 
-	igorHandler, err := igor.New()
+	igorHandler, err := igor.New(stor)
 	if err != nil {
 		logger.WithError(err).Fatal("init on_text igor handler")
 	}
 
-	bullingHandler, err := bulling.New()
+	bullingHandler, err := bulling.New(ctx, stor, logger)
 	if err != nil {
 		logger.WithError(err).Fatal("init on_text bulling handler")
 	}
@@ -68,7 +80,7 @@ func main() {
 		).Handle,
 	)
 
-	greetingsHandler, err := on_user_join.New()
+	greetingsHandler, err := on_user_join.New(ctx, stor, logger)
 	if err != nil {
 		logger.WithError(err).Fatal("can't init on_user_join handler")
 	}
@@ -84,14 +96,14 @@ func main() {
 		}
 	}
 
-	stickersReactionHandler, err := on_sticker.New(stickersFromPacks)
+	stickersReactionHandler, err := on_sticker.New(ctx, stor, logger, stickersFromPacks)
 	if err != nil {
 		logger.WithError(err).Fatal("can't init on_sticker handler")
 	}
 
 	b.Handle(telebot.OnSticker, stickersReactionHandler.Handle)
 
-	onVoice, err := on_voice.New()
+	onVoice, err := on_voice.New(ctx, stor, logger)
 	if err != nil {
 		logger.WithError(err).Fatal("can't init on_voice handler")
 	}
