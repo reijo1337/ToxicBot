@@ -13,14 +13,14 @@ func (h *Handler) reloadVoices() error {
 
 	r = r.GetEnabled()
 
-	stickers := make([]string, 0, len(r))
+	voices := make([]string, 0, len(r))
 	for _, dto := range r {
-		stickers = append(stickers, dto.VoiceID)
+		voices = append(voices, dto.VoiceID)
 	}
 
 	h.muVcs.Lock()
 	defer h.muVcs.Unlock()
-	h.voices = stickers
+	h.voices = voices
 
 	return nil
 }

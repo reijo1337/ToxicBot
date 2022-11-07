@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/reijo1337/ToxicBot/internal/google_spreadsheet"
 	"github.com/reijo1337/ToxicBot/internal/storage"
 	"os"
@@ -30,18 +31,29 @@ type config struct {
 }
 
 func main() {
-	ctx := context.Background()
-
+	var err error
 	logger := newLogger()
+	defer func() {
+		if err != nil {
+			logger.WithError(err).Fatal("application close with error")
+		}
+	}()
 
-	cfg, err := newConfig()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var cfg *config
+	cfg, err = newConfig()
 	if err != nil {
-		logger.WithError(err).Fatal("can't init config")
+		err = fmt.Errorf("cannot initialize config: %w", err)
+		return
 	}
 
-	gs, err := google_spreadsheet.New(ctx)
+	var gs google_spreadsheet.Manager
+	gs, err = google_spreadsheet.New(ctx)
 	if err != nil {
-		logger.WithError(err).Fatal("can't create google spreadsheet instance")
+		err = fmt.Errorf("can't create google spreadsheet instance: %w", err)
+		return
 	}
 
 	stor := storage.New(gs)
@@ -59,17 +71,20 @@ func main() {
 
 	b, err := telebot.NewBot(pref)
 	if err != nil {
-		logger.WithError(err).Fatal("can't init bot api")
+		err = fmt.Errorf("can't init bot api: %w", err)
+		return
 	}
 
 	igorHandler, err := igor.New(stor)
 	if err != nil {
-		logger.WithError(err).Fatal("init on_text igor handler")
+		err = fmt.Errorf("init on_text igor handler: %w", err)
+		return
 	}
 
 	bullingHandler, err := bulling.New(ctx, stor, logger)
 	if err != nil {
-		logger.WithError(err).Fatal("init on_text bulling handler")
+		err = fmt.Errorf("init on_text bulling handler: %w", err)
+		return
 	}
 
 	b.Handle(
@@ -82,7 +97,8 @@ func main() {
 
 	greetingsHandler, err := on_user_join.New(ctx, stor, logger)
 	if err != nil {
-		logger.WithError(err).Fatal("can't init on_user_join handler")
+		err = fmt.Errorf("can't init on_user_join handler: %w", err)
+		return
 	}
 	b.Handle(telebot.OnUserJoined, greetingsHandler.Handle)
 
@@ -98,14 +114,16 @@ func main() {
 
 	stickersReactionHandler, err := on_sticker.New(ctx, stor, logger, stickersFromPacks)
 	if err != nil {
-		logger.WithError(err).Fatal("can't init on_sticker handler")
+		err = fmt.Errorf("can't init on_sticker handler: %w", err)
+		return
 	}
 
 	b.Handle(telebot.OnSticker, stickersReactionHandler.Handle)
 
 	onVoice, err := on_voice.New(ctx, stor, logger)
 	if err != nil {
-		logger.WithError(err).Fatal("can't init on_voice handler")
+		err = fmt.Errorf("can't init on_voice handler: %w", err)
+		return
 	}
 	b.Handle(telebot.OnVoice, onVoice.Handle)
 
