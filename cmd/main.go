@@ -69,19 +69,22 @@ func main() {
 		},
 	}
 
-	b, err := telebot.NewBot(pref)
+	var b *telebot.Bot
+	b, err = telebot.NewBot(pref)
 	if err != nil {
 		err = fmt.Errorf("can't init bot api: %w", err)
 		return
 	}
 
-	igorHandler, err := igor.New(stor)
+	var igorHandler on_text.SubHandler
+	igorHandler, err = igor.New(stor)
 	if err != nil {
 		err = fmt.Errorf("init on_text igor handler: %w", err)
 		return
 	}
 
-	bullingHandler, err := bulling.New(ctx, stor, logger)
+	var bullingHandler on_text.SubHandler
+	bullingHandler, err = bulling.New(ctx, stor, logger)
 	if err != nil {
 		err = fmt.Errorf("init on_text bulling handler: %w", err)
 		return
@@ -95,7 +98,8 @@ func main() {
 		).Handle,
 	)
 
-	greetingsHandler, err := on_user_join.New(ctx, stor, logger)
+	var greetingsHandler *on_user_join.Greetings
+	greetingsHandler, err = on_user_join.New(ctx, stor, logger)
 	if err != nil {
 		err = fmt.Errorf("can't init on_user_join handler: %w", err)
 		return
@@ -112,7 +116,8 @@ func main() {
 		}
 	}
 
-	stickersReactionHandler, err := on_sticker.New(ctx, stor, logger, stickersFromPacks)
+	var stickersReactionHandler *on_sticker.StickerReactions
+	stickersReactionHandler, err = on_sticker.New(ctx, stor, logger, stickersFromPacks)
 	if err != nil {
 		err = fmt.Errorf("can't init on_sticker handler: %w", err)
 		return
@@ -120,7 +125,8 @@ func main() {
 
 	b.Handle(telebot.OnSticker, stickersReactionHandler.Handle)
 
-	onVoice, err := on_voice.New(ctx, stor, logger)
+	var onVoice *on_voice.Handler
+	onVoice, err = on_voice.New(ctx, stor, logger)
 	if err != nil {
 		err = fmt.Errorf("can't init on_voice handler: %w", err)
 		return
