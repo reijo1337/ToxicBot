@@ -3,23 +3,23 @@ package on_sticker
 import (
 	"context"
 	"fmt"
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/sirupsen/logrus"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/storage"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/telebot.v3"
 )
 
 type StickerReactions struct {
-	cfg               config
+	storage           storage.Manager
+	r                 *rand.Rand
+	logger            *logrus.Logger
 	stickers          []string
 	stickersFromPacks []string
+	cfg               config
 	muStk             sync.RWMutex
-	r                 *rand.Rand
-	storage           storage.Manager
-	logger            *logrus.Logger
 }
 
 func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger, stickersFromPacks []string) (*StickerReactions, error) {

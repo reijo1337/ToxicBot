@@ -2,9 +2,10 @@ package storage
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/reijo1337/ToxicBot/internal/google_spreadsheet"
 	"gopkg.in/Iwark/spreadsheet.v2"
-	"strings"
 )
 
 type Storage struct {

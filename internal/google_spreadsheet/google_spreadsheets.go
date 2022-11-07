@@ -3,17 +3,18 @@ package google_spreadsheet
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
 	"gopkg.in/Iwark/spreadsheet.v2"
-	"net/http"
 )
 
 type Client struct {
-	cfg       config
 	configJwt *jwt.Config
 	client    *http.Client
 	service   *spreadsheet.Service
+	cfg       config
 }
 
 func New(ctx context.Context) (googleClient *Client, err error) {

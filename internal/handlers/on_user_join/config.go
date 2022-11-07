@@ -12,8 +12,9 @@ type config struct {
 
 func (g *Greetings) parseConfig() error {
 	if err := envconfig.Process("", &g.cfg); err != nil {
-		envconfig.Usage("", g.cfg)
-		return err
+		if err = envconfig.Usage("", g.cfg); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -3,25 +3,23 @@ package on_user_join
 import (
 	"context"
 	"fmt"
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/sirupsen/logrus"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/reijo1337/ToxicBot/internal/storage"
+	"github.com/sirupsen/logrus"
 
 	"gopkg.in/telebot.v3"
 )
 
 type Greetings struct {
-	cfg config
-
-	storage storage.Manager
-	logger  *logrus.Logger
-
+	storage  storage.Manager
+	logger   *logrus.Logger
+	r        *rand.Rand
 	messages []string
+	cfg      config
 	muMsg    sync.RWMutex
-
-	r *rand.Rand
 }
 
 func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Greetings, error) {
@@ -47,7 +45,6 @@ func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Gre
 func (g *Greetings) Handle(ctx telebot.Context) error {
 	randomIndex := g.r.Intn(len(g.messages))
 	text := g.messages[randomIndex]
-	ctx.Reply(text)
 
-	return nil
+	return ctx.Reply(text)
 }

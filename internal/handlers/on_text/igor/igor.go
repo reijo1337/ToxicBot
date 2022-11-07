@@ -2,13 +2,14 @@ package igor
 
 import (
 	"fmt"
-	"github.com/reijo1337/ToxicBot/internal/storage"
 	"math/rand"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
+	"github.com/reijo1337/ToxicBot/internal/storage"
+
 	"gopkg.in/telebot.v3"
 )
 
@@ -17,9 +18,9 @@ const (
 )
 
 type igor struct {
+	s  storage.Manager
 	r  *rand.Rand
 	id int64
-	s  storage.Manager
 }
 
 func New(storage storage.Manager) (on_text.SubHandler, error) {

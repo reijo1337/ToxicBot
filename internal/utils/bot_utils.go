@@ -6,7 +6,7 @@ import (
 
 func GetStickersFromPacks(bot *telebot.Bot, stickerPacksNames []string) ([]string, error) {
 
-	stickers := []string{}
+	var stickers []string
 
 	for _, pack := range stickerPacksNames {
 		stickerPack, err := bot.StickerSet(pack)

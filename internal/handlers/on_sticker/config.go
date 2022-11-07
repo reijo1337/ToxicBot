@@ -1,8 +1,9 @@
 package on_sticker
 
 import (
-	"github.com/kelseyhightower/envconfig"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
 )
 
 type config struct {
@@ -12,8 +13,9 @@ type config struct {
 
 func (sr *StickerReactions) parseConfig() error {
 	if err := envconfig.Process("", &sr.cfg); err != nil {
-		envconfig.Usage("", sr.cfg)
-		return err
+		if err = envconfig.Usage("", sr.cfg); err != nil {
+			return err
+		}
 	}
 
 	return nil

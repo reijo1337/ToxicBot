@@ -2,9 +2,10 @@ package bulling
 
 import (
 	"context"
-	"github.com/mb-14/gomarkov"
 	"strings"
 	"time"
+
+	"github.com/mb-14/gomarkov"
 )
 
 func (b *bulling) reloadMessages() error {

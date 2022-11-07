@@ -1,14 +1,15 @@
 package google_spreadsheet
 
 import (
-	"github.com/kelseyhightower/envconfig"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
 )
 
 type config struct {
+	SpreadsheetID string         `envconfig:"GOOGLE_SPREADSHEET_ID" required:"true"`
 	Credentials   credentialType `envconfig:"GOOGLE_CREDENTIALS" required:"true"`
 	CacheInterval time.Duration  `envconfig:"GOOGLE_CACHE_INTERVAL" default:"15m"`
-	SpreadsheetID string         `envconfig:"GOOGLE_SPREADSHEET_ID" required:"true"`
 }
 
 type credentialType []byte

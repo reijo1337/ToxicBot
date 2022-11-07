@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/reijo1337/ToxicBot/internal/google_spreadsheet"
-	"github.com/reijo1337/ToxicBot/internal/storage"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/reijo1337/ToxicBot/internal/google_spreadsheet"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_sticker"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/bulling"
@@ -18,16 +17,16 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_join"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
+	"github.com/reijo1337/ToxicBot/internal/storage"
 	"github.com/reijo1337/ToxicBot/internal/utils"
-	"gopkg.in/telebot.v3"
-
 	"github.com/sirupsen/logrus"
+	"gopkg.in/telebot.v3"
 )
 
 type config struct {
 	TelegramToken           string        `envconfig:"TELEGRAM_TOKEN" required:"true"`
-	TelegramLongPollTimeout time.Duration `envconfig:"TELEGRAM_LONG_POLL_TIMEOUT" default:"10s"`
 	StickerSets             []string      `envconfig:"STICKER_SETS" default:"static_bulling_by_stickersthiefbot"`
+	TelegramLongPollTimeout time.Duration `envconfig:"TELEGRAM_LONG_POLL_TIMEOUT" default:"10s"`
 }
 
 func main() {
@@ -157,7 +156,9 @@ func newLogger() *logrus.Logger {
 func newConfig() (*config, error) {
 	var cfg config
 	if err := envconfig.Process("", &cfg); err != nil {
-		envconfig.Usage("", cfg)
+		if err = envconfig.Usage("", cfg); err != nil {
+			return nil, err
+		}
 		return nil, err
 	}
 

@@ -4,33 +4,29 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/sirupsen/logrus"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
-	"gopkg.in/telebot.v3"
-
 	"github.com/mb-14/gomarkov"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
+	"github.com/reijo1337/ToxicBot/internal/storage"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/telebot.v3"
 )
 
 type bulling struct {
-	storage storage.Manager
-	logger  *logrus.Logger
-	cfg     config
-	r       *rand.Rand
-
-	messages []string
-	chain    *gomarkov.Chain
-	muMsg    sync.RWMutex
-
-	msgCount map[string]*list.List
-	muCount  sync.Mutex
-
+	storage    storage.Manager
+	logger     *logrus.Logger
+	r          *rand.Rand
+	chain      *gomarkov.Chain
+	msgCount   map[string]*list.List
 	cooldown   map[string]time.Time
+	messages   []string
+	cfg        config
+	muMsg      sync.RWMutex
+	muCount    sync.Mutex
 	muCooldown sync.Mutex
 }
 

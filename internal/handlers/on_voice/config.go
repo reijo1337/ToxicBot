@@ -1,8 +1,9 @@
 package on_voice
 
 import (
-	"github.com/kelseyhightower/envconfig"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
 )
 
 type config struct {
@@ -12,8 +13,9 @@ type config struct {
 
 func (h *Handler) parseConfig() error {
 	if err := envconfig.Process("", &h.cfg); err != nil {
-		envconfig.Usage("", h.cfg)
-		return err
+		if err = envconfig.Usage("", h.cfg); err != nil {
+			return err
+		}
 	}
 
 	return nil
