@@ -1,8 +1,6 @@
 name: Lint
 
-on:
-  push:
-    branches: [ * ]
+on: [push]
 
 jobs:
   golangci:
