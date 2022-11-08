@@ -3,7 +3,7 @@ name: Труба
 on:
   workflow_run:
     workflows: [lint]
-    branches: [google-spreadsheet-storage]
+    branches: [master]
     types: [completed]
 
 jobs:
