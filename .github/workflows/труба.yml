@@ -2,7 +2,7 @@ name: Труба
 
 on:
   workflow_run:
-    workflows: [Lint]
+    workflows: [lint]
     branches: [google-spreadsheet-storage]
     types: [completed]
 
