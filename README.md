@@ -2,9 +2,7 @@
 
 Telegram-бот, который будет вас булить в вашем собственном чате.
 
-[![Труба Actions Status](https://github.com/reijo1337/ToxicBot/workflows/Труба/badge.svg)](https://github.com/reijo1337/ToxicBot/actions)
-
-[![Lint Actions Status](https://github.com/reijo1337/ToxicBot/workflows/lint/badge.svg)](https://github.com/reijo1337/ToxicBot/actions)
+[![Труба Actions Status](https://github.com/reijo1337/ToxicBot/workflows/Труба/badge.svg)](https://github.com/reijo1337/ToxicBot/actions) [![Lint Actions Status](https://github.com/reijo1337/ToxicBot/workflows/lint/badge.svg)](https://github.com/reijo1337/ToxicBot/actions)
 
 ## Env
 
