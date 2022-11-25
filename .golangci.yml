@@ -1,0 +1,31 @@
+linters:
+  fast: true
+  enable:
+    - revive
+    - gosec         # https://github.com/securego/gosec
+    - goimports     # -
+    - errcheck      # https://github.com/kisielk/errcheck
+    - gosimple      # https://github.com/dominikh/go-tools/tree/master/simple
+    - govet         # https://golang.org/cmd/vet/
+    - ineffassign   # https://github.com/gordonklaus/ineffassign
+    - staticcheck   # https://github.com/dominikh/go-tools/tree/master/cmd/staticcheck
+    - typecheck     # -
+    - unused        # https://github.com/dominikh/go-tools/tree/master/unused
+    - bodyclose     # https://github.com/timakin/bodyclose
+    - exhaustive    # https://github.com/nishanths/exhaustive
+    - exportloopref # https://github.com/kyoh86/exportloopref
+    - gocritic      # https://github.com/go-critic/go-critic
+    - noctx         # https://github.com/sonatard/noctx
+    - unused
+
+linters-settings:
+  govet:
+    enable:
+      - fieldalignment
+  gosec:
+    excludes:
+      - G404 # чтоб не ругался на math/rand
+  revive:
+    rules:
+      - name: var-naming
+        disabled: true

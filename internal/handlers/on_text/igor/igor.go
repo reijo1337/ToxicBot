@@ -2,42 +2,37 @@ package igor
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
+	"github.com/reijo1337/ToxicBot/internal/storage"
+
 	"gopkg.in/telebot.v3"
 )
 
 const (
-	idEnv   = "IGOR_ID"
-	fileEnv = "IGOR_FILE_PATH"
+	idEnv = "IGOR_ID"
 )
 
 type igor struct {
-	r    *rand.Rand
-	id   int64
-	text string
+	s  storage.Manager
+	r  *rand.Rand
+	id int64
 }
 
-func New() (on_text.SubHandler, error) {
+func New(storage storage.Manager) (on_text.SubHandler, error) {
 	id, err := strconv.ParseInt(os.Getenv(idEnv), 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parse igor id from env: %w", err)
 	}
 
-	data, err := ioutil.ReadFile(os.Getenv(fileEnv))
-	if err != nil {
-		return nil, fmt.Errorf("read file: %w", err)
-	}
-
 	return &igor{
-		r:    rand.New(rand.NewSource(time.Now().UnixNano())),
-		id:   id,
-		text: string(data),
+		r:  rand.New(rand.NewSource(time.Now().UnixNano())),
+		id: id,
+		s:  storage,
 	}, nil
 }
 
@@ -55,5 +50,15 @@ func (i *igor) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
-	return ctx.Reply(i.text)
+	igorPhrases, err := i.s.GetIgors()
+	if err != nil {
+		return err
+	}
+	igorPhrases = igorPhrases.GetEnabled()
+
+	if idx := i.r.Intn(len(igorPhrases)); idx == 0 {
+		return ctx.Reply(igorPhrases[idx].Text)
+	}
+
+	return nil
 }
