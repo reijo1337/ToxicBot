@@ -24,8 +24,8 @@ func New(ctx context.Context) (googleClient *Client, err error) {
 		return googleClient, fmt.Errorf("cannot parse config: %w", err)
 	}
 
-	var credentialsBytes []byte
-	if _, err = base64.StdEncoding.Decode(credentialsBytes, googleClient.cfg.Credentials); err != nil {
+	credentialsBytes, err := base64.StdEncoding.DecodeString(googleClient.cfg.Credentials)
+	if err != nil {
 		return googleClient, fmt.Errorf("cannot decode base64 credentials: %w", err)
 	}
 
