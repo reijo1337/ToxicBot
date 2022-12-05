@@ -2,6 +2,7 @@ package google_spreadsheet
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 
@@ -23,7 +24,12 @@ func New(ctx context.Context) (googleClient *Client, err error) {
 		return googleClient, fmt.Errorf("cannot parse config: %w", err)
 	}
 
-	googleClient.configJwt, err = google.JWTConfigFromJSON(googleClient.cfg.Credentials, spreadsheet.Scope)
+	var credentialsBytes []byte
+	if _, err = base64.StdEncoding.Decode(credentialsBytes, googleClient.cfg.Credentials); err != nil {
+		return googleClient, fmt.Errorf("cannot decode base64 credentials: %w", err)
+	}
+
+	googleClient.configJwt, err = google.JWTConfigFromJSON(credentialsBytes, spreadsheet.Scope)
 	if err != nil {
 		return googleClient, fmt.Errorf("failed to create config for google jwt: %w", err)
 	}
