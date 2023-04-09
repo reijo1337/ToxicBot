@@ -55,5 +55,9 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		return err
 	}
 	time.Sleep(time.Duration(h.r.Intn(15) * 1_000_000_000))
-	return ctx.Reply(&telebot.Voice{File: telebot.File{FileID: voice}})
+	err := ctx.Reply(&telebot.Voice{File: telebot.File{FileID: voice}})
+	if err != nil {
+		h.logger.WithError(err).WithField("voice", voice).Error("can't send voice")
+	}
+	return err
 }
