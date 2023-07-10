@@ -7,7 +7,7 @@ import (
 )
 
 type config struct {
-	ReactChance        float32       `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.4"`
+	ReactChance        float32       `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.8"`
 	UpdateVoicesPeriod time.Duration `envconfig:"VOICE_UPDATE_PERIOD" default:"30m"`
 }
 

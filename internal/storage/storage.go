@@ -17,6 +17,7 @@ type SheetNameType string
 const (
 	SheetNameGreetings SheetNameType = "greetings"
 	SheetNameIgor      SheetNameType = "igor"
+	SheetNameMax       SheetNameType = "max"
 	SheetNameRandom    SheetNameType = "random"
 	SheetNameStickers  SheetNameType = "stickers"
 	SheetNameVoice     SheetNameType = "voice"
@@ -74,6 +75,15 @@ func (s *Storage) GetGreetings() (GreetingsDTOs, error) {
 func (s *Storage) GetIgors() (IgorDTOs, error) {
 	return getAllValuesInSheet(s, SheetNameIgor, func(row []spreadsheet.Cell) *IgorDTO {
 		return &IgorDTO{
+			Text:      row[0].Value,
+			IsEnabled: strings.Contains(row[1].Value, "TRUE"),
+		}
+	})
+}
+
+func (s *Storage) GetMaxs() (MaxDTOs, error) {
+	return getAllValuesInSheet(s, SheetNameIgor, func(row []spreadsheet.Cell) *MaxDTO {
+		return &MaxDTO{
 			Text:      row[0].Value,
 			IsEnabled: strings.Contains(row[1].Value, "TRUE"),
 		}

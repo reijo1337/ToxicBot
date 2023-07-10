@@ -14,6 +14,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/bulling"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/igor"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/max"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_join"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
@@ -82,6 +83,13 @@ func main() {
 		return
 	}
 
+	var maxHandler on_text.SubHandler
+	maxHandler, err = max.New(stor)
+	if err != nil {
+		err = fmt.Errorf("init on_text max handler: %w", err)
+		return
+	}
+
 	var bullingHandler on_text.SubHandler
 	bullingHandler, err = bulling.New(ctx, stor, logger)
 	if err != nil {
@@ -93,6 +101,7 @@ func main() {
 		telebot.OnText,
 		on_text.New(
 			igorHandler,
+			maxHandler,
 			bullingHandler,
 		).Handle,
 	)

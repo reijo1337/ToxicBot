@@ -1,7 +1,7 @@
 package storage
 
 type DTOType interface {
-	GreetingsDTO | IgorDTO | RandomDTO | StikersDTO | VoiceDTO
+	GreetingsDTO | IgorDTO | RandomDTO | StikersDTO | VoiceDTO | MaxDTO
 }
 
 type GreetingsDTO struct {
@@ -29,6 +29,23 @@ type IgorDTO struct {
 type IgorDTOs []IgorDTO
 
 func (a IgorDTOs) GetEnabled() IgorDTOs {
+	temp := a[:0]
+	for _, v := range a {
+		if v.IsEnabled {
+			temp = append(temp, v)
+		}
+	}
+	return temp
+}
+
+type MaxDTO struct {
+	Text      string
+	IsEnabled bool
+}
+
+type MaxDTOs []MaxDTO
+
+func (a MaxDTOs) GetEnabled() MaxDTOs {
 	temp := a[:0]
 	for _, v := range a {
 		if v.IsEnabled {
