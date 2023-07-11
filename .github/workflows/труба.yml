@@ -87,6 +87,7 @@ jobs:
         options: |
           --extra-vars "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} 
           IGOR_ID=${{ secrets.IGOR_ID }}
+          MAX_ID=${{ secrets.MAX_ID }}
           STICKER_SETS=${{ secrets.STICKER_SETS != '' && secrets.STICKER_SETS || 'static_bulling_by_stickersthiefbot' }}
           GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SPREADSHEET_ID=${{ secrets.GOOGLE_SPREADSHEET_ID }}"

@@ -26,7 +26,7 @@ type max struct {
 func New(storage storage.Manager) (on_text.SubHandler, error) {
 	id, err := strconv.ParseInt(os.Getenv(idEnv), 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parse igor id from env: %w", err)
+		return nil, fmt.Errorf("parse max id from env: %w", err)
 	}
 
 	return &max{
