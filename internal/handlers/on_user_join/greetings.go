@@ -3,34 +3,33 @@ package on_user_join
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/sirupsen/logrus"
 
 	"gopkg.in/telebot.v3"
 )
 
 type Greetings struct {
-	storage  storage.Manager
-	logger   *logrus.Logger
-	r        *rand.Rand
-	messages []string
-	cfg      config
-	muMsg    sync.RWMutex
+	storage              greetingsRepository
+	logger               logger
+	r                    randomizer
+	messages             []string
+	muMsg                sync.RWMutex
+	updateMessagesPeriod time.Duration
 }
 
-func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Greetings, error) {
+func New(
+	ctx context.Context,
+	stor greetingsRepository,
+	logger logger,
+	r randomizer,
+	updateMessagesPeriod time.Duration,
+) (*Greetings, error) {
 	out := Greetings{
-		storage: stor,
-		logger:  logger,
-		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-
-	if err := out.parseConfig(); err != nil {
-		return nil, fmt.Errorf("cannot parse config: %w", err)
+		storage:              stor,
+		logger:               logger,
+		r:                    r,
+		updateMessagesPeriod: updateMessagesPeriod,
 	}
 
 	if err := out.reloadMessages(); err != nil {

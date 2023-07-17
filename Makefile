@@ -1,3 +1,6 @@
+GO?=go
+GOPATH?=$(shell go env GOPATH)
+GOPACKAGES=$(shell go list ./...)
 
 ### билдит докер образ для выравнивания структур
 align-build:
@@ -9,8 +12,11 @@ align:
 
 ### врубает линтер
 lint:
-	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v1.50.1 golangci-lint run -v
+	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v1.53.3 golangci-lint run -v
 
 ### выравнивает импорты
 imports:
 	docker run --rm -v $(pwd):/data cytopia/goimports -d .
+
+fmt:
+	GOPATH=$(GOPATH) $(GO) fmt ${GOPACKAGES}

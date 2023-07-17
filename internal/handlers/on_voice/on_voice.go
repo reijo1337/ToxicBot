@@ -3,33 +3,36 @@ package on_voice
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/telebot.v3"
 )
 
 type Handler struct {
-	storage storage.Manager
-	r       *rand.Rand
-	logger  *logrus.Logger
-	voices  []string
-	cfg     config
-	muVcs   sync.RWMutex
+	storage      voicesRepository
+	r            randomizer
+	logger       logger
+	voices       []string
+	muVcs        sync.RWMutex
+	reactChance  float32
+	updatePeriod time.Duration
 }
 
-func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Handler, error) {
+func New(
+	ctx context.Context,
+	stor voicesRepository,
+	logger logger,
+	r randomizer,
+	reactChance float32,
+	updatePeriod time.Duration,
+) (*Handler, error) {
 	out := Handler{
-		storage: stor,
-		logger:  logger,
-		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-
-	if err := out.parseConfig(); err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
+		storage:      stor,
+		logger:       logger,
+		r:            r,
+		reactChance:  reactChance,
+		updatePeriod: updatePeriod,
 	}
 
 	if err := out.reloadVoices(); err != nil {
@@ -41,8 +44,12 @@ func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger) (*Han
 	return &out, nil
 }
 
+func (h *Handler) Slug() string {
+	return "on_voice"
+}
+
 func (h *Handler) Handle(ctx telebot.Context) error {
-	if h.r.Float32() > h.cfg.ReactChance {
+	if h.r.Float32() > h.reactChance {
 		return nil
 	}
 
@@ -57,7 +64,16 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	time.Sleep(time.Duration(h.r.Intn(15) * 1_000_000_000))
 	err := ctx.Reply(&telebot.Voice{File: telebot.File{FileID: voice}})
 	if err != nil {
-		h.logger.WithError(err).WithField("voice", voice).Error("can't send voice")
+		h.logger.Error(
+			h.logger.WithError(
+				h.logger.WithField(
+					context.Background(),
+					"voice", voice,
+				),
+				err,
+			),
+			"can't send voice",
+		)
 	}
 	return err
 }

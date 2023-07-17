@@ -2,147 +2,188 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
-	"github.com/reijo1337/ToxicBot/internal/google_spreadsheet"
+	"github.com/reijo1337/ToxicBot/internal/config"
+	"github.com/reijo1337/ToxicBot/internal/handlers"
+	"github.com/reijo1337/ToxicBot/internal/handlers/bulling"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_sticker"
-	"github.com/reijo1337/ToxicBot/internal/handlers/on_text"
-	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/bulling"
-	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/igor"
-	"github.com/reijo1337/ToxicBot/internal/handlers/on_text/max"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_join"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/reijo1337/ToxicBot/internal/utils"
-	"github.com/sirupsen/logrus"
+	"github.com/reijo1337/ToxicBot/internal/handlers/personal"
+	"github.com/reijo1337/ToxicBot/internal/handlers/tagger"
+	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets"
+	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets/google_spreadsheet"
+	"github.com/reijo1337/ToxicBot/internal/message"
+	"github.com/reijo1337/ToxicBot/pkg/logger"
 	"gopkg.in/telebot.v3"
 )
 
-type config struct {
-	TelegramToken           string        `envconfig:"TELEGRAM_TOKEN" required:"true"`
-	StickerSets             []string      `envconfig:"STICKER_SETS" default:"static_bulling_by_stickersthiefbot"`
-	TelegramLongPollTimeout time.Duration `envconfig:"TELEGRAM_LONG_POLL_TIMEOUT" default:"10s"`
-}
-
 func main() {
-	var err error
-	logger := newLogger()
-	defer func() {
-		if err != nil {
-			logger.WithError(err).Fatal("application close with error")
-		}
-	}()
+	logger := logger.New(logger.WithReposrtCaller(true))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var cfg *config
-	cfg, err = newConfig()
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	cfg, err := config.Parse()
 	if err != nil {
-		err = fmt.Errorf("cannot initialize config: %w", err)
-		return
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init config",
+		)
 	}
 
-	var gs google_spreadsheet.Manager
-	gs, err = google_spreadsheet.New(ctx)
+	gs, err := google_spreadsheet.New(ctx)
 	if err != nil {
-		err = fmt.Errorf("can't create google spreadsheet instance: %w", err)
-		return
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't create google spreadsheet instance",
+		)
 	}
 
-	stor := storage.New(gs)
+	sheetsRepository := sheets.New(gs)
+
+	generator, err := message.New(ctx, sheetsRepository, logger, random, cfg.BullingsUpdateMessagesPeriod, cfg.BullingsMarkovChance)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't create random text generator",
+		)
+	}
 
 	pref := telebot.Settings{
 		Token:  cfg.TelegramToken,
 		Poller: &telebot.LongPoller{Timeout: cfg.TelegramLongPollTimeout},
 		OnError: func(err error, ctx telebot.Context) {
-			logger.
-				WithError(err).
-				WithField("update", ctx.Update()).
-				Error("can't handle update")
+			logger.Error(
+				logger.WithField(
+					logger.WithError(context.Background(), err),
+					"update", ctx.Update(),
+				),
+				"can't handle update",
+			)
 		},
 	}
 
-	var b *telebot.Bot
-	b, err = telebot.NewBot(pref)
+	b, err := telebot.NewBot(pref)
 	if err != nil {
-		err = fmt.Errorf("can't init bot api: %w", err)
-		return
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init bot api",
+		)
 	}
 
-	var igorHandler on_text.SubHandler
-	igorHandler, err = igor.New(stor)
+	igorHandler, err := personal.New("igor", sheetsRepository.GetPersonal("igor"), 750)
 	if err != nil {
-		err = fmt.Errorf("init on_text igor handler: %w", err)
-		return
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init personal igor handler",
+		)
 	}
 
-	var maxHandler on_text.SubHandler
-	maxHandler, err = max.New(stor)
+	maxHandler, err := personal.New("max", sheetsRepository.GetPersonal("max"), 200)
 	if err != nil {
-		err = fmt.Errorf("init on_text max handler: %w", err)
-		return
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init personal max handler",
+		)
 	}
 
-	var bullingHandler on_text.SubHandler
-	bullingHandler, err = bulling.New(ctx, stor, logger)
+	bullingHandler, err := bulling.New(ctx, generator, cfg.ThresholdCount, cfg.ThresholdTime, cfg.Cooldown)
 	if err != nil {
-		err = fmt.Errorf("init on_text bulling handler: %w", err)
-		return
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init bulling handler",
+		)
 	}
+
+	greetingsHandler, err := on_user_join.New(ctx, sheetsRepository, logger, random, cfg.UpdateMessagesPeriod)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init greetings handler",
+		)
+	}
+
+	stickersFromPacks := []string{}
+	if len(cfg.StickerSets) > 0 {
+		stickersFromPacks, err = getStickersFromPacks(b, cfg.StickerSets)
+		if err != nil {
+			logger.Warn(
+				logger.WithError(ctx, err),
+				"can't get stickers from sticker packs",
+			)
+		}
+	}
+
+	stickersReactionHandler, err := on_sticker.New(ctx, sheetsRepository, logger, random, stickersFromPacks, cfg.StickerReactChance, cfg.UpdateStickersPeriod)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init sticker_reactions handler",
+		)
+	}
+
+	onVoice, err := on_voice.New(ctx, sheetsRepository, logger, random, cfg.VoiceReactChance, cfg.UpdateVoicesPeriod)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init on_voice handler",
+		)
+	}
+
+	tagger := tagger.New(ctx, generator, sheetsRepository, b, logger, random, cfg.TaggerIntervalFrom, cfg.TaggerIntervalTo)
 
 	b.Handle(
 		telebot.OnText,
-		on_text.New(
+		handlers.New(
+			telebot.OnText,
 			igorHandler,
 			maxHandler,
 			bullingHandler,
+			tagger,
 		).Handle,
 	)
 
-	var greetingsHandler *on_user_join.Greetings
-	greetingsHandler, err = on_user_join.New(ctx, stor, logger)
-	if err != nil {
-		err = fmt.Errorf("can't init on_user_join handler: %w", err)
-		return
-	}
+	b.Handle(
+		telebot.OnSticker,
+		handlers.New(
+			telebot.OnSticker,
+			stickersReactionHandler,
+			igorHandler,
+			maxHandler,
+			bullingHandler,
+			tagger,
+		).Handle,
+	)
+
+	b.Handle(
+		telebot.OnVoice,
+		handlers.New(
+			telebot.OnVoice,
+			onVoice,
+			igorHandler,
+			maxHandler,
+			tagger,
+		).Handle,
+	)
+
 	b.Handle(telebot.OnUserJoined, greetingsHandler.Handle)
 
 	b.Handle(telebot.OnUserLeft, on_user_left.Handle)
 
-	stickersFromPacks := []string{}
-	if len(cfg.StickerSets) > 0 {
-		stickersFromPacks, err = utils.GetStickersFromPacks(b, cfg.StickerSets)
-		if err != nil {
-			logger.WithError(err).Warn("can't get stickers from sticker packs")
-		}
-	}
-
-	var stickersReactionHandler *on_sticker.StickerReactions
-	stickersReactionHandler, err = on_sticker.New(ctx, stor, logger, stickersFromPacks)
-	if err != nil {
-		err = fmt.Errorf("can't init on_sticker handler: %w", err)
-		return
-	}
-
-	b.Handle(telebot.OnSticker, stickersReactionHandler.Handle)
-
-	var onVoice *on_voice.Handler
-	onVoice, err = on_voice.New(ctx, stor, logger)
-	if err != nil {
-		err = fmt.Errorf("can't init on_voice handler: %w", err)
-		return
-	}
-	b.Handle(telebot.OnVoice, onVoice.Handle)
-
 	go func() {
-		logger.WithField("user_name", b.Me.Username).Info("bot started")
+		logger.Info(
+			logger.WithField(ctx, "user_name", b.Me.Username),
+			"bot started",
+		)
 		b.Start()
 	}()
 
@@ -153,23 +194,22 @@ func main() {
 	b.Stop()
 }
 
-func newLogger() *logrus.Logger {
-	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.TextFormatter{})
-	logger.SetReportCaller(true)
+func getStickersFromPacks(bot *telebot.Bot, stickerPacksNames []string) ([]string, error) {
 
-	return logger
-}
+	var stickers []string
 
-func newConfig() (*config, error) {
-	var cfg config
-	if err := envconfig.Process("", &cfg); err != nil {
-		if err = envconfig.Usage("", cfg); err != nil {
+	for _, pack := range stickerPacksNames {
+		stickerPack, err := bot.StickerSet(pack)
+		if err != nil {
 			return nil, err
 		}
-		return nil, err
+
+		for _, sticker := range stickerPack.Stickers {
+			if sticker.FileID != "" {
+				stickers = append(stickers, sticker.FileID)
+			}
+		}
 	}
 
-	return &cfg, nil
+	return stickers, nil
 }
