@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	logger := logger.New(logger.WithReposrtCaller(true))
+	logger := logger.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

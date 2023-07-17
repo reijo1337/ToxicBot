@@ -30,7 +30,7 @@ jobs:
       run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o bot -v cmd/main.go
 
     - name: Test
-      run: go test -v ./...
+      run: go test -race -v ./...
 
     - name: Upload binary
       uses: actions/upload-artifact@v2
