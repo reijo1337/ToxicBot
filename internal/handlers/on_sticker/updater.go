@@ -6,17 +6,13 @@ import (
 )
 
 func (sr *StickerReactions) reloadStickers() error {
-	r, err := sr.storage.GetStickers()
+	r, err := sr.storage.GetEnabledStickers()
 	if err != nil {
 		return err
 	}
 
-	r = r.GetEnabled()
-
-	stickers := make([]string, 0, len(r))
-	for _, dto := range r {
-		stickers = append(stickers, dto.StickerID)
-	}
+	stickers := make([]string, len(r))
+	copy(stickers, r)
 
 	sr.muStk.Lock()
 	defer sr.muStk.Unlock()
@@ -26,12 +22,15 @@ func (sr *StickerReactions) reloadStickers() error {
 }
 
 func (sr *StickerReactions) runUpdater(ctx context.Context) {
-	t := time.NewTimer(sr.cfg.UpdateStickersPeriod)
+	t := time.NewTimer(sr.updateStickersPeriod)
 	for {
 		select {
 		case <-t.C:
 			if err := sr.reloadStickers(); err != nil {
-				sr.logger.WithError(err).Warn("cannot reload stickers")
+				sr.logger.Warn(
+					sr.logger.WithError(context.Background(), err),
+					"cannot reload stickers",
+				)
 			}
 		case <-ctx.Done():
 			return

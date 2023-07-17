@@ -6,17 +6,13 @@ import (
 )
 
 func (g *Greetings) reloadMessages() error {
-	r, err := g.storage.GetGreetings()
+	r, err := g.storage.GetEnabledGreetings()
 	if err != nil {
 		return err
 	}
 
-	r = r.GetEnabled()
-
-	m := make([]string, 0, len(r))
-	for _, dto := range r {
-		m = append(m, dto.Text)
-	}
+	m := make([]string, len(r))
+	copy(m, r)
 
 	g.muMsg.Lock()
 	defer g.muMsg.Unlock()
@@ -26,12 +22,21 @@ func (g *Greetings) reloadMessages() error {
 }
 
 func (g *Greetings) runUpdater(ctx context.Context) {
-	t := time.NewTimer(g.cfg.UpdateMessagesPeriod)
+	t := time.NewTimer(g.updateMessagesPeriod)
 	for {
 		select {
 		case <-t.C:
 			if err := g.reloadMessages(); err != nil {
-				g.logger.WithError(err).Warn("cannot reload messages")
+				g.logger.Warn(
+					g.logger.WithError(
+						g.logger.WithField(
+							ctx,
+							"handler", "greetings",
+						),
+						err,
+					),
+					"cannot reload messages",
+				)
 			}
 		case <-ctx.Done():
 			return

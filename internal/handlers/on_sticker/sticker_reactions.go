@@ -3,35 +3,39 @@ package on_sticker
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/reijo1337/ToxicBot/internal/storage"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/telebot.v3"
 )
 
 type StickerReactions struct {
-	storage           storage.Manager
-	r                 *rand.Rand
-	logger            *logrus.Logger
-	stickers          []string
-	stickersFromPacks []string
-	cfg               config
-	muStk             sync.RWMutex
+	storage              stickerRepository
+	r                    randomizer
+	logger               logger
+	stickers             []string
+	stickersFromPacks    []string
+	muStk                sync.RWMutex
+	reactChance          float32
+	updateStickersPeriod time.Duration
 }
 
-func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger, stickersFromPacks []string) (*StickerReactions, error) {
+func New(
+	ctx context.Context,
+	stor stickerRepository,
+	logger logger,
+	r randomizer,
+	stickersFromPacks []string,
+	reactChance float32,
+	updateStickersPeriod time.Duration,
+) (*StickerReactions, error) {
 	out := StickerReactions{
-		storage:           stor,
-		logger:            logger,
-		stickersFromPacks: stickersFromPacks,
-		r:                 rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-
-	if err := out.parseConfig(); err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
+		storage:              stor,
+		logger:               logger,
+		stickersFromPacks:    stickersFromPacks,
+		r:                    r,
+		reactChance:          reactChance,
+		updateStickersPeriod: updateStickersPeriod,
 	}
 
 	if err := out.reloadStickers(); err != nil {
@@ -42,8 +46,12 @@ func New(ctx context.Context, stor storage.Manager, logger *logrus.Logger, stick
 	return &out, nil
 }
 
+func (*StickerReactions) Slug() string {
+	return "sticker_reactions"
+}
+
 func (sr *StickerReactions) Handle(ctx telebot.Context) error {
-	if sr.r.Float32() > sr.cfg.ReactChance {
+	if sr.r.Float32() > sr.reactChance {
 		return nil
 	}
 
