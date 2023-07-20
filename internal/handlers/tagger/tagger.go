@@ -23,11 +23,13 @@ type Handler struct {
 	nicknameRepository nicknameRepository
 	bot                *telebot.Bot
 	queue              *taggerQueue
-	chatToUsers        map[string][]*telebot.User
+	chatToUsers        map[string][]int64
 	uniqueUsers        map[string]struct{}
 	nextFromNano       int64
 	nextInterval       int64
 	mu                 sync.Mutex
+	nicknames          []string
+	nicknamesMu        sync.RWMutex
 }
 
 func New(
@@ -38,7 +40,8 @@ func New(
 	log logger,
 	random randomizer,
 	nextFrom, nextTo time.Duration,
-) *Handler {
+	updateNicknames time.Duration,
+) (*Handler, error) {
 	if nextFrom > nextTo {
 		nextFrom, nextTo = nextTo, nextFrom
 	}
@@ -48,16 +51,42 @@ func New(
 		nicknameRepository: nicknameRepository,
 		log:                log,
 		queue:              &taggerQueue{queue: make([]taggerJob, 0, 10)},
-		chatToUsers:        make(map[string][]*telebot.User, 10),
+		chatToUsers:        make(map[string][]int64, 10),
 		uniqueUsers:        make(map[string]struct{}, 2_000),
 		nextFromNano:       nextFrom.Nanoseconds(),
 		nextInterval:       nextTo.Nanoseconds() - nextFrom.Nanoseconds() + 1,
 		random:             random,
 	}
 
+	if err := out.updateNicknames(); err != nil {
+		return nil, fmt.Errorf("can't init nicknames list: %w", err)
+	}
+
+	go func() {
+		t := time.NewTimer(updateNicknames)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if err := out.updateNicknames(); err != nil {
+					log.Warn(
+						log.WithFields(
+							log.WithError(ctx, err),
+							map[string]any{
+								"handler": "tagger",
+							},
+						),
+						"can't update nicknames",
+					)
+				}
+			}
+		}
+	}()
+
 	go out.sender(ctx)
 
-	return out
+	return out, nil
 }
 
 func (h *Handler) sender(ctx context.Context) {
@@ -101,7 +130,7 @@ func (h *Handler) sender(ctx context.Context) {
 		index := h.random.Intn(len(users))
 		user := users[index]
 
-		text := fmt.Sprintf("[%s](tg://user?id=%d), %s", nickname, user.ID, h.generator.GetMessageText())
+		text := fmt.Sprintf("[%s](tg://user?id=%d), %s", nickname, user, h.generator.GetMessageText())
 		h.mu.Unlock()
 
 		if _, err := h.bot.Send(chat(task.chatID), text, telebot.ModeMarkdown); err != nil {
@@ -109,9 +138,8 @@ func (h *Handler) sender(ctx context.Context) {
 				h.log.WithFields(
 					h.log.WithError(ctx, err),
 					map[string]any{
-						"chat_id":       task.chatID,
-						"user_id":       user.ID,
-						"user_username": user.Username,
+						"chat_id": task.chatID,
+						"user_id": user,
 					},
 				),
 				"can't send tagger message",
@@ -128,6 +156,20 @@ func (h *Handler) sender(ctx context.Context) {
 	}
 }
 
+func (h *Handler) updateNicknames() error {
+	nicknames, err := h.nicknameRepository.GetEnabledNicknames()
+	if err != nil {
+		return fmt.Errorf("can't get nicknames from repository: %w", err)
+	}
+
+	h.nicknamesMu.Lock()
+	defer h.nicknamesMu.Unlock()
+	h.nicknames = make([]string, len(nicknames))
+	copy(h.nicknames, nicknames)
+
+	return nil
+}
+
 func (h *Handler) Slug() string {
 	return "tagger"
 }
@@ -139,30 +181,33 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
-	key := fmt.Sprintf("%d:%d", chat.ID, user.ID)
+	h.addChatInfo(chat.Recipient(), user)
 
+	return nil
+}
+
+func (h *Handler) addChatInfo(chat string, user *telebot.User) {
+	key := fmt.Sprintf("%s:%d", chat, user.ID)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if _, notUnique := h.uniqueUsers[key]; notUnique {
-		return nil
+		return
 	}
 
 	h.uniqueUsers[key] = struct{}{}
 
-	h.chatToUsers[chat.Recipient()] = append(h.chatToUsers[chat.Recipient()], user)
+	h.chatToUsers[chat] = append(h.chatToUsers[chat], user.ID)
 
-	if len(h.chatToUsers[chat.Recipient()]) == 1 {
+	if len(h.chatToUsers[chat]) == 1 {
 		heap.Push(
 			h.queue,
 			taggerJob{
-				chatID: chat.Recipient(),
+				chatID: chat,
 				tagAt:  h.makeTagAt(),
 			},
 		)
 	}
-
-	return nil
 }
 
 func (h *Handler) makeTagAt() time.Time {

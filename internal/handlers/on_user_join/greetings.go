@@ -47,3 +47,7 @@ func (g *Greetings) Handle(ctx telebot.Context) error {
 
 	return ctx.Reply(text)
 }
+
+func (g *Greetings) Slug() string {
+	return "greetings"
+}

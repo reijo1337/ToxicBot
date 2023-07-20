@@ -24,6 +24,7 @@ type Config struct {
 	StickerReactChance           float32       `envconfig:"STICKER_REACTIONS_CHANCE" default:"0.4"`
 	BullingsMarkovChance         float32       `envconfig:"BULLINGS_MARKOV_CHANCE" default:"0.75"`
 	VoiceReactChance             float32       `envconfig:"VOICE_REACTIONS_CHANCE" default:"0.8"`
+	NicknamesUpdatePerios        time.Duration `envconfig:"NICKNAMES_UPDATE_PREIOD" default:"10m"`
 }
 
 func Parse() (*Config, error) {

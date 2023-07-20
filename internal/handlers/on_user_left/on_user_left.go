@@ -6,6 +6,16 @@ import (
 
 const text = "Порвался"
 
-func Handle(ctx telebot.Context) error {
+type Handler struct{}
+
+func New() Handler {
+	return Handler{}
+}
+
+func (Handler) Slug() string {
+	return "on_user_left"
+}
+
+func (Handler) Handle(ctx telebot.Context) error {
 	return ctx.Reply(text)
 }

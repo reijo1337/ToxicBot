@@ -139,7 +139,15 @@ func main() {
 		)
 	}
 
-	tagger := tagger.New(ctx, generator, sheetsRepository, b, logger, random, cfg.TaggerIntervalFrom, cfg.TaggerIntervalTo)
+	tagger, err := tagger.New(ctx, generator, sheetsRepository, b, logger, random, cfg.TaggerIntervalFrom, cfg.TaggerIntervalTo, cfg.NicknamesUpdatePerios)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init tagger handler",
+		)
+	}
+
+	onLeft := on_user_left.New()
 
 	b.Handle(
 		telebot.OnText,
@@ -175,9 +183,25 @@ func main() {
 		).Handle,
 	)
 
-	b.Handle(telebot.OnUserJoined, greetingsHandler.Handle)
+	b.Handle(
+		telebot.OnUserJoined,
+		handlers.New(
+			telebot.OnUserJoined,
+			greetingsHandler,
+			tagger.OnJoin(),
+		).Handle,
+	)
 
-	b.Handle(telebot.OnUserLeft, on_user_left.Handle)
+	b.Handle(
+		telebot.OnUserLeft,
+		handlers.New(
+			telebot.OnUserLeft,
+			onLeft,
+			tagger.OnLeft(),
+		).Handle,
+	)
+
+	b.Handle(telebot.OnMedia, tagger.Handle)
 
 	go func() {
 		logger.Info(
