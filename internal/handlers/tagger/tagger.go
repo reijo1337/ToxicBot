@@ -21,15 +21,15 @@ type Handler struct {
 	log                logger
 	random             randomizer
 	nicknameRepository nicknameRepository
-	bot                *telebot.Bot
-	queue              *taggerQueue
 	chatToUsers        map[string][]int64
+	queue              *taggerQueue
+	bot                *telebot.Bot
 	uniqueUsers        map[string]struct{}
+	nicknames          []string
 	nextFromNano       int64
 	nextInterval       int64
-	mu                 sync.Mutex
-	nicknames          []string
 	nicknamesMu        sync.RWMutex
+	mu                 sync.Mutex
 }
 
 func New(
