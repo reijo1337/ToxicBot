@@ -96,6 +96,14 @@ func main() {
 		)
 	}
 
+	kirillHandler, err := personal.New("kirill", sheetsRepository.GetPersonal("kirill"), 150)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init personal kirill handler",
+		)
+	}
+
 	bullingHandler, err := bulling.New(ctx, generator, cfg.ThresholdCount, cfg.ThresholdTime, cfg.Cooldown)
 	if err != nil {
 		logger.Fatal(
@@ -157,6 +165,7 @@ func main() {
 			maxHandler,
 			bullingHandler,
 			tagger,
+			kirillHandler,
 		).Handle,
 	)
 
@@ -169,6 +178,7 @@ func main() {
 			maxHandler,
 			bullingHandler,
 			tagger,
+			kirillHandler,
 		).Handle,
 	)
 
@@ -180,6 +190,7 @@ func main() {
 			igorHandler,
 			maxHandler,
 			tagger,
+			kirillHandler,
 		).Handle,
 	)
 
