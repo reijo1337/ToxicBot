@@ -32,7 +32,7 @@ func New(
 	env := fmt.Sprintf(envFormat, strings.ToUpper(name))
 	id, err := strconv.ParseInt(os.Getenv(env), 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parse max id from env: %w", err)
+		return nil, fmt.Errorf("parse %s id from env: %w", name, err)
 	}
 
 	return &Handler{

@@ -18,6 +18,7 @@
           TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
           IGOR_ID: "{{ IGOR_ID }}"
           MAX_ID: "{{ MAX_ID }}"
+          KIRILL_ID: "{{ KIRILL_ID }}"
           STICKER_SETS: "{{ STICKER_SETS }}"
           GOOGLE_CREDENTIALS: "{{ GOOGLE_CREDENTIALS }}"
           GOOGLE_SPREADSHEET_ID: "{{ GOOGLE_SPREADSHEET_ID }}"
