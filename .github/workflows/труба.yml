@@ -121,4 +121,5 @@ jobs:
           STICKER_SETS=${{ secrets.STICKER_SETS != '' && secrets.STICKER_SETS || 'static_bulling_by_stickersthiefbot' }}
           GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SPREADSHEET_ID=${{ secrets.GOOGLE_SPREADSHEET_ID }}"
+          -vvvv
 
