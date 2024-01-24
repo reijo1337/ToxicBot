@@ -106,9 +106,12 @@ jobs:
       with:
         playbook: deploy.yaml
         directory: deploy/
+        key: ${{secrets.SSH_MAMA_KEY}}
         inventory: |
           [vscale_host]
-          vscale ansible_host=${{secrets.MAMA_HOST}} ansible_user=root ansible_ssh_pass=${{secrets.MAMA_HOST_PASS}}
+          vscale ansible_host=194.67.205.50 ansible_user=root
+        known_hosts: |
+          194.67.205.50 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPNiRNHClv376xJ2WlGjnVyEwWyJT9UqScQYqPYaGgLL
         options: |
           --extra-vars "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} 
           IGOR_ID=${{ secrets.IGOR_ID }}
