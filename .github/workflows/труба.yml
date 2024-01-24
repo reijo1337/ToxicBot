@@ -106,7 +106,6 @@ jobs:
       with:
         playbook: deploy.yaml
         directory: deploy/
-        key: ${{secrets.SSH_MAMA_KEY}}
         inventory: |
           [vscale_host]
           vscale ansible_host=${{secrets.MAMA_HOST}} ansible_user=root ansible_ssh_pass=${{secrets.MAMA_HOST_PASS}}
