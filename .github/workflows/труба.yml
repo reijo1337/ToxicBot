@@ -106,10 +106,10 @@ jobs:
       with:
         playbook: deploy.yaml
         directory: deploy/
-        key: ${{secrets.SSH_PRIVATE_KEY}}
+        key: ${{secrets.SSH_MAMA_KEY}}
         inventory: |
           [vscale_host]
-          vscale ansible_host=37.228.116.131 ansible_user=root
+          vscale ansible_host=${{secrets.MAMA_HOST}} ansible_user=root
         options: |
           --extra-vars "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} 
           IGOR_ID=${{ secrets.IGOR_ID }}
