@@ -110,9 +110,6 @@ jobs:
         inventory: |
           [vscale_host]
           vscale ansible_host=194.67.205.50 ansible_user=root
-        known_hosts: |
-          194.67.205.50 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPNiRNHClv376xJ2WlGjnVyEwWyJT9UqScQYqPYaGgLL
-          194.67.205.50 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMB6j/+bw0NEPYWb93ajvjsAlWfOu98CaW8ykSKEh2bgtEdG6TB7lRkv+GVBgYTH3KtWNEa2LcCTVxkn9v/2qBM=
         options: |
           --extra-vars "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} 
           IGOR_ID=${{ secrets.IGOR_ID }}
