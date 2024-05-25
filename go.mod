@@ -10,7 +10,7 @@ require (
 	go.uber.org/mock v0.4.0
 	golang.org/x/oauth2 v0.1.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20220412131121-41eea1483964
-	gopkg.in/telebot.v3 v3.1.3
+	gopkg.in/telebot.v3 v3.2.1
 )
 
 require (
