@@ -12,12 +12,12 @@ import (
 type Handler struct {
 	storage      voicesRepository
 	r            randomizer
+	downloader   downloader
 	logger       logger
 	voices       []telebot.File
 	muVcs        sync.RWMutex
 	reactChance  float32
 	updatePeriod time.Duration
-	downloader   downloader
 }
 
 func New(
