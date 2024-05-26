@@ -139,7 +139,7 @@ func main() {
 		)
 	}
 
-	onVoice, err := on_voice.New(ctx, sheetsRepository, logger, random, cfg.VoiceReactChance, cfg.UpdateVoicesPeriod)
+	onVoice, err := on_voice.New(ctx, sheetsRepository, logger, random, cfg.VoiceReactChance, cfg.UpdateVoicesPeriod, b)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),

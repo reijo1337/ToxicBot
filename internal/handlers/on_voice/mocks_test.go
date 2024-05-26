@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
+	telebot "gopkg.in/telebot.v3"
 )
 
 // MockvoicesRepository is a mock of voicesRepository interface.
@@ -178,4 +179,42 @@ func (m *Mockrandomizer) Intn(n int) int {
 func (mr *MockrandomizerMockRecorder) Intn(n any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Intn", reflect.TypeOf((*Mockrandomizer)(nil).Intn), n)
+}
+
+// Mockdownloader is a mock of downloader interface.
+type Mockdownloader struct {
+	ctrl     *gomock.Controller
+	recorder *MockdownloaderMockRecorder
+}
+
+// MockdownloaderMockRecorder is the mock recorder for Mockdownloader.
+type MockdownloaderMockRecorder struct {
+	mock *Mockdownloader
+}
+
+// NewMockdownloader creates a new mock instance.
+func NewMockdownloader(ctrl *gomock.Controller) *Mockdownloader {
+	mock := &Mockdownloader{ctrl: ctrl}
+	mock.recorder = &MockdownloaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockdownloader) EXPECT() *MockdownloaderMockRecorder {
+	return m.recorder
+}
+
+// FileByID mocks base method.
+func (m *Mockdownloader) FileByID(fileID string) (telebot.File, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FileByID", fileID)
+	ret0, _ := ret[0].(telebot.File)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FileByID indicates an expected call of FileByID.
+func (mr *MockdownloaderMockRecorder) FileByID(fileID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FileByID", reflect.TypeOf((*Mockdownloader)(nil).FileByID), fileID)
 }

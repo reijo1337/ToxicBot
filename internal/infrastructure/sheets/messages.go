@@ -24,7 +24,7 @@ func (r *Repository) GetEnabledStickers() ([]string, error) {
 }
 
 func (r *Repository) GetEnabledVoices() ([]string, error) {
-	return getEditableMessagesFromSheet(r.sheets, "voice")
+	return getEditableMessagesFromSheet(r.sheets, "voice_id")
 }
 
 func (r *Repository) GetEnabledRandom() ([]string, error) {

@@ -13,10 +13,11 @@ type Handler struct {
 	storage      voicesRepository
 	r            randomizer
 	logger       logger
-	voices       []string
+	voices       []telebot.File
 	muVcs        sync.RWMutex
 	reactChance  float32
 	updatePeriod time.Duration
+	downloader   downloader
 }
 
 func New(
@@ -26,6 +27,7 @@ func New(
 	r randomizer,
 	reactChance float32,
 	updatePeriod time.Duration,
+	downloader downloader,
 ) (*Handler, error) {
 	out := Handler{
 		storage:      stor,
@@ -33,6 +35,7 @@ func New(
 		r:            r,
 		reactChance:  reactChance,
 		updatePeriod: updatePeriod,
+		downloader:   downloader,
 	}
 
 	if err := out.reloadVoices(); err != nil {
@@ -62,7 +65,10 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		return err
 	}
 	time.Sleep(time.Duration(h.r.Intn(15) * 1_000_000_000))
-	err := ctx.Reply(&telebot.Voice{File: telebot.File{FileID: voice}})
+
+	response := telebot.Voice{File: voice}
+
+	err := ctx.Reply(&response)
 	if err != nil {
 		h.logger.Error(
 			h.logger.WithError(

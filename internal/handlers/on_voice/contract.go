@@ -1,7 +1,11 @@
 //go:generate mockgen -source $GOFILE -destination mocks_test.go -package ${GOPACKAGE}
 package on_voice
 
-import "context"
+import (
+	"context"
+
+	"gopkg.in/telebot.v3"
+)
 
 type voicesRepository interface {
 	GetEnabledVoices() ([]string, error)
@@ -17,4 +21,8 @@ type logger interface {
 type randomizer interface {
 	Float32() float32
 	Intn(n int) int
+}
+
+type downloader interface {
+	FileByID(fileID string) (telebot.File, error)
 }
