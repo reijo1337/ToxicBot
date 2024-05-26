@@ -2,10 +2,7 @@ package on_voice
 
 import (
 	"context"
-	"fmt"
 	"time"
-
-	"gopkg.in/telebot.v3"
 )
 
 func (h *Handler) reloadVoices() error {
@@ -14,15 +11,9 @@ func (h *Handler) reloadVoices() error {
 		return err
 	}
 
-	voices := make([]telebot.File, len(r))
+	voices := make([]string, len(r))
 
-	for i, id := range r {
-		file, err := h.downloader.FileByID(id)
-		if err != nil {
-			return fmt.Errorf("can't get file %s: %w", id, err)
-		}
-		voices[i] = file
-	}
+	copy(voices, r)
 
 	h.muVcs.Lock()
 	defer h.muVcs.Unlock()

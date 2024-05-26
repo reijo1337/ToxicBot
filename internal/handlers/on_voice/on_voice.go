@@ -14,7 +14,7 @@ type Handler struct {
 	r            randomizer
 	downloader   downloader
 	logger       logger
-	voices       []telebot.File
+	voices       []string
 	muVcs        sync.RWMutex
 	reactChance  float32
 	updatePeriod time.Duration
@@ -58,8 +58,14 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 
 	h.muVcs.RLock()
 	defer h.muVcs.RUnlock()
+
 	randomIndex := h.r.Intn(len(h.voices))
-	voice := h.voices[randomIndex]
+	voiceID := h.voices[randomIndex]
+
+	voice, err := h.downloader.FileByID(voiceID)
+	if err != nil {
+		return fmt.Errorf("can't get voice %s: %w", voiceID, err)
+	}
 
 	if err := ctx.Notify(telebot.RecordingAudio); err != nil {
 		return err
@@ -68,7 +74,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 
 	response := telebot.Voice{File: voice}
 
-	err := ctx.Reply(&response)
+	err = ctx.Reply(&response)
 	if err != nil {
 		h.logger.Error(
 			h.logger.WithError(
