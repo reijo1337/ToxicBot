@@ -50,7 +50,14 @@ func main() {
 
 	sheetsRepository := sheets.New(gs)
 
-	generator, err := message.New(ctx, sheetsRepository, logger, random, cfg.BullingsUpdateMessagesPeriod, cfg.BullingsMarkovChance)
+	generator, err := message.New(
+		ctx,
+		sheetsRepository,
+		logger,
+		random,
+		cfg.BullingsUpdateMessagesPeriod,
+		cfg.BullingsMarkovChance,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -104,7 +111,13 @@ func main() {
 		)
 	}
 
-	bullingHandler, err := bulling.New(ctx, generator, cfg.ThresholdCount, cfg.ThresholdTime, cfg.Cooldown)
+	bullingHandler, err := bulling.New(
+		ctx,
+		generator,
+		cfg.ThresholdCount,
+		cfg.ThresholdTime,
+		cfg.Cooldown,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -112,7 +125,13 @@ func main() {
 		)
 	}
 
-	greetingsHandler, err := on_user_join.New(ctx, sheetsRepository, logger, random, cfg.UpdateMessagesPeriod)
+	greetingsHandler, err := on_user_join.New(
+		ctx,
+		sheetsRepository,
+		logger,
+		random,
+		cfg.UpdateMessagesPeriod,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -131,7 +150,15 @@ func main() {
 		}
 	}
 
-	stickersReactionHandler, err := on_sticker.New(ctx, sheetsRepository, logger, random, stickersFromPacks, cfg.StickerReactChance, cfg.UpdateStickersPeriod)
+	stickersReactionHandler, err := on_sticker.New(
+		ctx,
+		sheetsRepository,
+		logger,
+		random,
+		stickersFromPacks,
+		cfg.StickerReactChance,
+		cfg.UpdateStickersPeriod,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -139,7 +166,15 @@ func main() {
 		)
 	}
 
-	onVoice, err := on_voice.New(ctx, sheetsRepository, logger, random, cfg.VoiceReactChance, cfg.UpdateVoicesPeriod, b)
+	onVoice, err := on_voice.New(
+		ctx,
+		sheetsRepository,
+		logger,
+		random,
+		cfg.VoiceReactChance,
+		cfg.UpdateVoicesPeriod,
+		b,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -147,7 +182,17 @@ func main() {
 		)
 	}
 
-	tagger, err := tagger.New(ctx, generator, sheetsRepository, b, logger, random, cfg.TaggerIntervalFrom, cfg.TaggerIntervalTo, cfg.NicknamesUpdatePerios)
+	tagger, err := tagger.New(
+		ctx,
+		generator,
+		sheetsRepository,
+		b,
+		logger,
+		random,
+		cfg.TaggerIntervalFrom,
+		cfg.TaggerIntervalTo,
+		cfg.NicknamesUpdatePerios,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -230,7 +275,6 @@ func main() {
 }
 
 func getStickersFromPacks(bot *telebot.Bot, stickerPacksNames []string) ([]string, error) {
-
 	var stickers []string
 
 	for _, pack := range stickerPacksNames {

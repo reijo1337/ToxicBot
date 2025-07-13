@@ -1,4 +1,4 @@
-//go:generate mockgen -source $GOFILE -destination mocks_test.go -package ${GOPACKAGE}
+//go:generate go tool go.uber.org/mock/mockgen -source $GOFILE -destination mocks_test.go -package ${GOPACKAGE}
 package tagger
 
 import "context"

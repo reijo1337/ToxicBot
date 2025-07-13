@@ -40,5 +40,8 @@ func New(ctx context.Context) (googleClient *Client, err error) {
 }
 
 func (c *Client) GetSpreadsheet() (spreadsheet.Spreadsheet, error) {
-	return c.service.FetchSpreadsheet(c.cfg.SpreadsheetID, spreadsheet.WithCache(c.cfg.CacheInterval))
+	return c.service.FetchSpreadsheet(
+		c.cfg.SpreadsheetID,
+		spreadsheet.WithCache(c.cfg.CacheInterval),
+	)
 }

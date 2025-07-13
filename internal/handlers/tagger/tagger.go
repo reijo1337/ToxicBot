@@ -64,6 +64,7 @@ func New(
 
 	go func() {
 		t := time.NewTimer(updateNicknames)
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -104,6 +105,7 @@ func (h *Handler) sender(ctx context.Context) {
 
 		taskI := heap.Pop(h.queue)
 		task := taskI.(taggerJob)
+
 		if time.Now().Before(task.tagAt) {
 			heap.Push(h.queue, task)
 			continue
@@ -122,6 +124,7 @@ func (h *Handler) sender(ctx context.Context) {
 
 		h.mu.Lock()
 		users := h.chatToUsers[task.chatID]
+
 		if len(users) == 0 {
 			h.mu.Unlock()
 			continue
@@ -130,7 +133,12 @@ func (h *Handler) sender(ctx context.Context) {
 		index := h.random.Intn(len(users))
 		user := users[index]
 
-		text := fmt.Sprintf("[%s](tg://user?id=%d), %s", nickname, user, h.generator.GetMessageText())
+		text := fmt.Sprintf(
+			"[%s](tg://user?id=%d), %s",
+			nickname,
+			user,
+			h.generator.GetMessageText(),
+		)
 		h.mu.Unlock()
 
 		if _, err := h.bot.Send(chat(task.chatID), text, telebot.ModeMarkdown); err != nil {
@@ -188,6 +196,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 
 func (h *Handler) addChatInfo(chat string, user *telebot.User) {
 	key := fmt.Sprintf("%s:%d", chat, user.ID)
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

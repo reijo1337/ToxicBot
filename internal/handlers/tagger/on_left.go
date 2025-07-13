@@ -36,6 +36,7 @@ func (h *OnLeftHandler) Handle(ctx telebot.Context) error {
 
 		users := h.chatToUsers[chat.Recipient()]
 		delete(h.chatToUsers, chat.Recipient())
+
 		for _, userID := range users {
 			key := fmt.Sprintf("%s:%d", chat.Recipient(), userID)
 			delete(h.uniqueUsers, key)
@@ -47,6 +48,7 @@ func (h *OnLeftHandler) Handle(ctx telebot.Context) error {
 	// кого-то хлопнули - чистим инфу
 	h.mu.Lock()
 	users := h.chatToUsers[chat.Recipient()]
+
 	if len(users) != 0 {
 		i := 0
 		for ; i < len(users); i++ {
@@ -54,10 +56,12 @@ func (h *OnLeftHandler) Handle(ctx telebot.Context) error {
 				break
 			}
 		}
+
 		if i != len(users) {
 			users[len(users)-1], users[i] = users[i], users[len(users)-1]
 			h.chatToUsers[chat.Recipient()] = users[:len(users)-1]
 		}
+
 		key := fmt.Sprintf("%s:%d", chat.Recipient(), left.ID)
 		delete(h.uniqueUsers, key)
 	}

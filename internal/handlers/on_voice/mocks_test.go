@@ -21,6 +21,7 @@ import (
 type MockvoicesRepository struct {
 	ctrl     *gomock.Controller
 	recorder *MockvoicesRepositoryMockRecorder
+	isgomock struct{}
 }
 
 // MockvoicesRepositoryMockRecorder is the mock recorder for MockvoicesRepository.
@@ -59,6 +60,7 @@ func (mr *MockvoicesRepositoryMockRecorder) GetEnabledVoices() *gomock.Call {
 type Mocklogger struct {
 	ctrl     *gomock.Controller
 	recorder *MockloggerMockRecorder
+	isgomock struct{}
 }
 
 // MockloggerMockRecorder is the mock recorder for Mocklogger.
@@ -134,6 +136,7 @@ func (mr *MockloggerMockRecorder) WithField(arg0, arg1, arg2 any) *gomock.Call {
 type Mockrandomizer struct {
 	ctrl     *gomock.Controller
 	recorder *MockrandomizerMockRecorder
+	isgomock struct{}
 }
 
 // MockrandomizerMockRecorder is the mock recorder for Mockrandomizer.
@@ -185,6 +188,7 @@ func (mr *MockrandomizerMockRecorder) Intn(n any) *gomock.Call {
 type Mockdownloader struct {
 	ctrl     *gomock.Controller
 	recorder *MockdownloaderMockRecorder
+	isgomock struct{}
 }
 
 // MockdownloaderMockRecorder is the mock recorder for Mockdownloader.

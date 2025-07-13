@@ -31,9 +31,11 @@ func makeDefaultUnsetedOptions(o *options) {
 	if o.level == nil {
 		o.level = pointer.To(InfoLevel)
 	}
+
 	if o.format == nil {
 		o.format = pointer.To(TextFormat)
 	}
+
 	if o.reportCaller == nil {
 		o.reportCaller = pointer.To(false)
 	}

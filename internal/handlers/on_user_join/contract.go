@@ -1,6 +1,6 @@
 package on_user_join
 
-//go:generate mockgen -source $GOFILE -destination mocks_test.go -package ${GOPACKAGE}
+//go:generate go tool go.uber.org/mock/mockgen -source $GOFILE -destination mocks_test.go -package ${GOPACKAGE}
 import "context"
 
 type greetingsRepository interface {

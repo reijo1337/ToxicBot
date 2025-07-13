@@ -49,6 +49,7 @@ func New(
 
 func (g *Generator) runUpdater(ctx context.Context) {
 	t := time.NewTimer(g.updatePeriod)
+
 	for {
 		select {
 		case <-t.C:
@@ -67,7 +68,7 @@ func (g *Generator) runUpdater(ctx context.Context) {
 func (g *Generator) reloadMessages() error {
 	r, err := g.storage.GetEnabledRandom()
 	if err != nil {
-		return err
+		return fmt.Errorf("g.storage.GetEnabledRandom() error: %w", err)
 	}
 
 	m := make([]string, len(r))
@@ -103,12 +104,15 @@ func (g *Generator) GetMessageText() string {
 func (g *Generator) generateDegenerate() (string, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+
 	tokens := []string{gomarkov.StartToken}
+
 	for tokens[len(tokens)-1] != gomarkov.EndToken {
 		next, err := g.chain.Generate(tokens[(len(tokens) - 1):])
 		if err != nil {
 			return "", fmt.Errorf("can't generate next token: %w", err)
 		}
+
 		tokens = append(tokens, next)
 	}
 	return strings.Join(tokens[1:len(tokens)-1], " "), nil

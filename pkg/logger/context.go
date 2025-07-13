@@ -6,9 +6,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	entryCtxKey struct{}
-)
+type ctxKey struct{}
+
+var entryCtxKey ctxKey
 
 func (l *Logger) getEntry(ctx context.Context) *logrus.Entry {
 	entry, ok := ctx.Value(entryCtxKey).(*logrus.Entry)
@@ -19,7 +19,10 @@ func (l *Logger) getEntry(ctx context.Context) *logrus.Entry {
 	return entry
 }
 
-func (l *Logger) ctxBuilder(ctx context.Context, buildEntry func(*logrus.Entry) *logrus.Entry) context.Context {
+func (l *Logger) ctxBuilder(
+	ctx context.Context,
+	buildEntry func(*logrus.Entry) *logrus.Entry,
+) context.Context {
 	entry := l.getEntry(ctx)
 	entry = buildEntry(entry)
 	return context.WithValue(ctx, entryCtxKey, entry)

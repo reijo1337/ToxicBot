@@ -68,7 +68,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	if err := ctx.Notify(telebot.RecordingAudio); err != nil {
-		return err
+		return fmt.Errorf("ctx.Notify error: %w", err)
 	}
 	time.Sleep(time.Duration(h.r.Intn(15) * 1_000_000_000))
 

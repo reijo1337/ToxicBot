@@ -13,13 +13,14 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
-	spreadsheet_v2 "gopkg.in/Iwark/spreadsheet.v2"
+	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
 // Mocksheets is a mock of sheets interface.
 type Mocksheets struct {
 	ctrl     *gomock.Controller
 	recorder *MocksheetsMockRecorder
+	isgomock struct{}
 }
 
 // MocksheetsMockRecorder is the mock recorder for Mocksheets.
@@ -40,10 +41,10 @@ func (m *Mocksheets) EXPECT() *MocksheetsMockRecorder {
 }
 
 // GetSpreadsheet mocks base method.
-func (m *Mocksheets) GetSpreadsheet() (spreadsheet_v2.Spreadsheet, error) {
+func (m *Mocksheets) GetSpreadsheet() (spreadsheet.Spreadsheet, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSpreadsheet")
-	ret0, _ := ret[0].(spreadsheet_v2.Spreadsheet)
+	ret0, _ := ret[0].(spreadsheet.Spreadsheet)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

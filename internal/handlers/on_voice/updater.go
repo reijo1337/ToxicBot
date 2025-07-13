@@ -2,13 +2,14 @@ package on_voice
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
 func (h *Handler) reloadVoices() error {
 	r, err := h.storage.GetEnabledVoices()
 	if err != nil {
-		return err
+		return fmt.Errorf("storage.GetEnabledVoices error: %w", err)
 	}
 
 	voices := make([]string, len(r))
@@ -24,17 +25,12 @@ func (h *Handler) reloadVoices() error {
 
 func (h *Handler) runUpdater(ctx context.Context) {
 	t := time.NewTimer(h.updatePeriod)
+
 	for {
 		select {
 		case <-t.C:
 			if err := h.reloadVoices(); err != nil {
-				h.logger.Warn(
-					h.logger.WithError(
-						context.Background(),
-						err,
-					),
-					"cannot reload voices",
-				)
+				h.logger.Warn(h.logger.WithError(ctx, err), "cannot reload voices")
 			}
 		case <-ctx.Done():
 			return

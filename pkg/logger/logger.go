@@ -28,6 +28,7 @@ func New(opts ...Option) *Logger {
 	for _, setOption := range opts {
 		setOption(options)
 	}
+
 	makeDefaultUnsetedOptions(options)
 
 	l := logrus.New()

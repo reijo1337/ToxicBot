@@ -23,6 +23,7 @@ func (g *Greetings) reloadMessages() error {
 
 func (g *Greetings) runUpdater(ctx context.Context) {
 	t := time.NewTimer(g.updateMessagesPeriod)
+
 	for {
 		select {
 		case <-t.C:

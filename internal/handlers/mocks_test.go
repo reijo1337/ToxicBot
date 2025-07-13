@@ -13,13 +13,14 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
-	telebot_v3 "gopkg.in/telebot.v3"
+	telebot "gopkg.in/telebot.v3"
 )
 
 // MocksubHandler is a mock of subHandler interface.
 type MocksubHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MocksubHandlerMockRecorder
+	isgomock struct{}
 }
 
 // MocksubHandlerMockRecorder is the mock recorder for MocksubHandler.
@@ -40,7 +41,7 @@ func (m *MocksubHandler) EXPECT() *MocksubHandlerMockRecorder {
 }
 
 // Handle mocks base method.
-func (m *MocksubHandler) Handle(arg0 telebot_v3.Context) error {
+func (m *MocksubHandler) Handle(arg0 telebot.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Handle", arg0)
 	ret0, _ := ret[0].(error)

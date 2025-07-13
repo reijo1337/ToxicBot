@@ -23,14 +23,12 @@ func (sr *StickerReactions) reloadStickers() error {
 
 func (sr *StickerReactions) runUpdater(ctx context.Context) {
 	t := time.NewTimer(sr.updateStickersPeriod)
+
 	for {
 		select {
 		case <-t.C:
 			if err := sr.reloadStickers(); err != nil {
-				sr.logger.Warn(
-					sr.logger.WithError(context.Background(), err),
-					"cannot reload stickers",
-				)
+				sr.logger.Warn(sr.logger.WithError(ctx, err), "cannot reload stickers")
 			}
 		case <-ctx.Done():
 			return

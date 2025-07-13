@@ -20,6 +20,7 @@ import (
 type MockgreetingsRepository struct {
 	ctrl     *gomock.Controller
 	recorder *MockgreetingsRepositoryMockRecorder
+	isgomock struct{}
 }
 
 // MockgreetingsRepositoryMockRecorder is the mock recorder for MockgreetingsRepository.
@@ -58,6 +59,7 @@ func (mr *MockgreetingsRepositoryMockRecorder) GetEnabledGreetings() *gomock.Cal
 type Mocklogger struct {
 	ctrl     *gomock.Controller
 	recorder *MockloggerMockRecorder
+	isgomock struct{}
 }
 
 // MockloggerMockRecorder is the mock recorder for Mocklogger.
@@ -121,6 +123,7 @@ func (mr *MockloggerMockRecorder) WithField(arg0, arg1, arg2 any) *gomock.Call {
 type Mockrandomizer struct {
 	ctrl     *gomock.Controller
 	recorder *MockrandomizerMockRecorder
+	isgomock struct{}
 }
 
 // MockrandomizerMockRecorder is the mock recorder for Mockrandomizer.

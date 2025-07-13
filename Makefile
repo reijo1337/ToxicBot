@@ -12,11 +12,11 @@ align:
 
 ### врубает линтер
 lint:
-	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v1.58 golangci-lint run -v
+	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.2.2 golangci-lint run -v
 
 ### выравнивает импорты
 imports:
 	docker run --rm -v $(pwd):/data cytopia/goimports -d .
 
 fmt:
-	GOPATH=$(GOPATH) $(GO) fmt ${GOPACKAGES}
+	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.2.2 golangci-lint fmt -v

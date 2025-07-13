@@ -41,6 +41,7 @@ func New(
 	if err := out.reloadStickers(); err != nil {
 		return nil, fmt.Errorf("cannot reload stickers: %w", err)
 	}
+
 	go out.runUpdater(ctx)
 
 	return &out, nil

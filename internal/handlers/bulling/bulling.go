@@ -50,6 +50,7 @@ func (b *Handler) Slug() string {
 func (b *Handler) Handle(ctx telebot.Context) error {
 	chat := ctx.Chat()
 	user := ctx.Sender()
+
 	if chat == nil || user == nil {
 		return nil
 	}
@@ -69,6 +70,7 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 	if _, ok := b.msgCount[key]; !ok {
 		b.msgCount[key] = list.New()
 	}
+
 	b.msgCount[key].PushBack(ctx.Message().Time())
 
 	// Удаляем инфу, старше порога времени из конфига
