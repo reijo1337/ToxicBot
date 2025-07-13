@@ -33,13 +33,13 @@ jobs:
       run: go test -race -v ./...
 
     - name: Upload binary
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: go-binary
         path: bot
 
     - name: Upload dockerfile
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: Dockerfile
         path: Dockerfile
