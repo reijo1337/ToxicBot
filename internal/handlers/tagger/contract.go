@@ -8,7 +8,7 @@ type nicknameRepository interface {
 }
 
 type messageGenerator interface {
-	GetMessageText() string
+	GetMessageText(prompt string) string
 }
 
 type logger interface {

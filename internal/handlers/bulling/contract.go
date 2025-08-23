@@ -2,5 +2,5 @@
 package bulling
 
 type messageGenerator interface {
-	GetMessageText() string
+	GetMessageText(replyTo string) string
 }

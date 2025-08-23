@@ -17,9 +17,11 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
 	"github.com/reijo1337/ToxicBot/internal/handlers/personal"
 	"github.com/reijo1337/ToxicBot/internal/handlers/tagger"
+	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets/google_spreadsheet"
 	"github.com/reijo1337/ToxicBot/internal/message"
+	"github.com/reijo1337/ToxicBot/internal/phrase_filter"
 	"github.com/reijo1337/ToxicBot/pkg/logger"
 	"gopkg.in/telebot.v3"
 )
@@ -50,13 +52,26 @@ func main() {
 
 	sheetsRepository := sheets.New(gs)
 
+	phraseFilter := phrase_filter.NewDefaultPhraseFilter()
+
+	ai, err := deepseek.New()
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't create deepseek client",
+		)
+	}
+
 	generator, err := message.New(
 		ctx,
 		sheetsRepository,
 		logger,
 		random,
+		phraseFilter,
+		ai,
 		cfg.BullingsUpdateMessagesPeriod,
 		cfg.BullingsMarkovChance,
+		cfg.BullingsAIChance,
 	)
 	if err != nil {
 		logger.Fatal(

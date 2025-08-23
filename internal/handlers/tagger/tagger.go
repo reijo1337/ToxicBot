@@ -10,6 +10,8 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
+const prompt = "Придумай внезапное оскорбление для участника чата"
+
 type chat string
 
 func (c chat) Recipient() string {
@@ -137,7 +139,7 @@ func (h *Handler) sender(ctx context.Context) {
 			"[%s](tg://user?id=%d), %s",
 			nickname,
 			user,
-			h.generator.GetMessageText(),
+			h.generator.GetMessageText(prompt),
 		)
 		h.mu.Unlock()
 
