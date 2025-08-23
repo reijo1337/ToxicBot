@@ -132,7 +132,7 @@ func (b *Handler) isMsgThreshold(key string, msgTime time.Time) bool {
 
 func isReplyOrMention(ctx telebot.Context) bool {
 	me := ctx.Bot().Me
-	isMention := strings.Contains(ctx.Message().Text, fmt.Sprintf("@%s", me.Username))
+	isMention := strings.Contains(ctx.Message().Text, "@"+me.Username)
 	isReply := pointer.From(pointer.From(ctx.Message().ReplyTo).Sender).ID == me.ID
 	return isMention || isReply
 }

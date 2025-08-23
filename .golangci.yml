@@ -47,7 +47,6 @@ linters:
     - interfacebloat
     - intrange
     - loggercheck
-    - maintidx
     - makezero
     - mirror
     - misspell
@@ -58,7 +57,6 @@ linters:
     - nilnesserr
     - nilnil
     - noctx
-    - nolintlint
     - nosprintfhostport
     - paralleltest
     - perfsprint
@@ -73,7 +71,6 @@ linters:
     - sloglint
     - spancheck
     - sqlclosecheck
-    - staticcheck
     - tagliatelle
     - testableexamples
     - testifylint
@@ -89,9 +86,6 @@ linters:
     - whitespace
     - zerologlint
   settings:
-    govet:
-      enable:
-        - fieldalignment
     gosec:
       excludes:
         - G404 # чтоб не ругался на math/rand

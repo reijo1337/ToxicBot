@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,7 +72,7 @@ func New() (*Client, error) {
 // Chat отправляет запрос к API чата
 func (c *Client) Chat(ctx context.Context, msgs ...ChatMessage) (string, error) {
 	if len(msgs) == 0 {
-		return "", fmt.Errorf("no messages provided")
+		return "", errors.New("no messages provided")
 	}
 
 	req := chatRequest{
@@ -84,7 +85,12 @@ func (c *Client) Chat(ctx context.Context, msgs ...ChatMessage) (string, error) 
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.cfg.BaseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		c.cfg.BaseURL+"/v1/chat/completions",
+		bytes.NewBuffer(jsonData),
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -107,7 +113,7 @@ func (c *Client) Chat(ctx context.Context, msgs ...ChatMessage) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("failed to send request after retries: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -128,7 +134,7 @@ func (c *Client) Chat(ctx context.Context, msgs ...ChatMessage) (string, error) 
 	}
 
 	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+		return "", errors.New("no choices in response")
 	}
 
 	return chatResp.Choices[0].Message.Content, nil

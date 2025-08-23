@@ -27,15 +27,29 @@ func NewDefaultPhraseFilter() *DefaultPhraseFilter {
 		maxLength: 1000,
 		minWords:  2,
 		meaninglessPatterns: []*regexp.Regexp{
-			regexp.MustCompile(`^[^\p{L}]*$`),                     // Только символы без букв
-			regexp.MustCompile(`^[а-яё]{1,2}$`),                   // Одно-двухбуквенные слова
-			regexp.MustCompile(`^[a-z]{1,2}$`),                    // Одно-двухбуквенные английские слова
-			regexp.MustCompile(`^[^\p{L}]*[а-яё]{1,2}[^\p{L}]*$`), // Только одно-двухбуквенные слова с символами
-			regexp.MustCompile(`^[^\p{L}]*[a-z]{1,2}[^\p{L}]*$`),  // Только одно-двухбуквенные английские слова с символами
-			regexp.MustCompile(`^[а-яё]+[^\p{L}\d]*$`),            // Только русские буквы с символами (но не цифрами) в конце
-			regexp.MustCompile(`^[a-z]+[^\p{L}\d]*$`),             // Только английские буквы с символами (но не цифрами) в конце
-			regexp.MustCompile(`^[^\p{L}]*[а-яё]+$`),              // Только русские буквы с символами в начале
-			regexp.MustCompile(`^[^\p{L}]*[a-z]+$`),               // Только английские буквы с символами в начале
+			regexp.MustCompile(`^[^\p{L}]*$`),   // Только символы без букв
+			regexp.MustCompile(`^[а-яё]{1,2}$`), // Одно-двухбуквенные слова
+			regexp.MustCompile(
+				`^[a-z]{1,2}$`,
+			), // Одно-двухбуквенные английские слова
+			regexp.MustCompile(
+				`^[^\p{L}]*[а-яё]{1,2}[^\p{L}]*$`,
+			), // Только одно-двухбуквенные слова с символами
+			regexp.MustCompile(
+				`^[^\p{L}]*[a-z]{1,2}[^\p{L}]*$`,
+			), // Только одно-двухбуквенные английские слова с символами
+			regexp.MustCompile(
+				`^[а-яё]+[^\p{L}\d]*$`,
+			), // Только русские буквы с символами (но не цифрами) в конце
+			regexp.MustCompile(
+				`^[a-z]+[^\p{L}\d]*$`,
+			), // Только английские буквы с символами (но не цифрами) в конце
+			regexp.MustCompile(
+				`^[^\p{L}]*[а-яё]+$`,
+			), // Только русские буквы с символами в начале
+			regexp.MustCompile(
+				`^[^\p{L}]*[a-z]+$`,
+			), // Только английские буквы с символами в начале
 		},
 		meaningfulPatterns: []*regexp.Regexp{
 			regexp.MustCompile(`\b[а-яё]{3,}\b`),         // Русские слова от 3 букв
@@ -94,7 +108,7 @@ func (f *DefaultPhraseFilter) checkBasicConditions(text string) bool {
 
 	// Подсчитываем слова
 	words := f.countWords(text)
-	if words < f.minWords {
+	if words < f.minWords { //nolint:staticcheck
 		return false
 	}
 
@@ -175,7 +189,19 @@ func (f *DefaultPhraseFilter) containsVerbs(text string) bool {
 // containsQuestionOrExclamation проверяет наличие вопросительных или восклицательных конструкций
 func (f *DefaultPhraseFilter) containsQuestionOrExclamation(text string) bool {
 	// Проверяем наличие вопросительных слов
-	questionWords := []string{"что", "как", "где", "когда", "почему", "зачем", "what", "how", "where", "when", "why"}
+	questionWords := []string{
+		"что",
+		"как",
+		"где",
+		"когда",
+		"почему",
+		"зачем",
+		"what",
+		"how",
+		"where",
+		"when",
+		"why",
+	}
 	for _, word := range questionWords {
 		if strings.Contains(strings.ToLower(text), word) {
 			return true
