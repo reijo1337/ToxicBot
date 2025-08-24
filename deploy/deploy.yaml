@@ -22,6 +22,7 @@
           STICKER_SETS: "{{ STICKER_SETS }}"
           GOOGLE_CREDENTIALS: "{{ GOOGLE_CREDENTIALS }}"
           GOOGLE_SPREADSHEET_ID: "{{ GOOGLE_SPREADSHEET_ID }}"
+          DEEPSEEK_API_KEY: "{{ DEEPSEEK_API_KEY }}"
 
     - name: Prune unused imagages
       community.docker.docker_prune:
