@@ -23,7 +23,8 @@
           GOOGLE_CREDENTIALS: "{{ GOOGLE_CREDENTIALS }}"
           GOOGLE_SPREADSHEET_ID: "{{ GOOGLE_SPREADSHEET_ID }}"
           DEEPSEEK_API_KEY: "{{ DEEPSEEK_API_KEY }}"
-          BULLINGS_THRESHOLD_COUNT: 1
+          BULLINGS_THRESHOLD_COUNT: "2"
+          BULLINGS_THRESHOLD_TIME: "5m"
 
     - name: Prune unused imagages
       community.docker.docker_prune:
