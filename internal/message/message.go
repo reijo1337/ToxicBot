@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mb-14/gomarkov"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 )
 
@@ -27,12 +26,10 @@ type Generator struct {
 	logger            logger
 	meaningfullFilter meaningfullFilter
 	ai                ai
-	chain             *gomarkov.Chain
 	messages          []string
 	systemPrompt      string
 	updatePeriod      time.Duration
 	mu                sync.RWMutex
-	markovChance      float32
 	aiChance          float32
 }
 
@@ -44,7 +41,6 @@ func New(
 	meaningfullFilter meaningfullFilter,
 	ai ai,
 	updatePeriod time.Duration,
-	markovChance float32,
 	aiChance float32,
 ) (*Generator, error) {
 	out := Generator{
@@ -53,9 +49,7 @@ func New(
 		r:                 r,
 		meaningfullFilter: meaningfullFilter,
 		ai:                ai,
-		chain:             gomarkov.NewChain(1),
 		updatePeriod:      updatePeriod,
-		markovChance:      markovChance,
 		aiChance:          aiChance,
 	}
 
@@ -98,9 +92,7 @@ func (g *Generator) reloadMessages() error {
 	systemPromptBuilder := strings.Builder{}
 	systemPromptBuilder.WriteString(systemPromptBase)
 
-	chain := gomarkov.NewChain(1)
 	for _, message := range m {
-		chain.Add(strings.Split(strings.Trim(message, " "), " "))
 		systemPromptBuilder.WriteString("\n- ")
 		systemPromptBuilder.WriteString(message)
 	}
@@ -108,7 +100,6 @@ func (g *Generator) reloadMessages() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.messages = m
-	g.chain = chain
 	g.systemPrompt = systemPromptBuilder.String()
 
 	return nil
@@ -125,41 +116,10 @@ func (g *Generator) GetMessageText(replyTo string) string {
 		)
 	}
 
-	text, err = g.generateMarkov()
-	if err == nil {
-		return text
-	} else if !errors.Is(err, errGenerationUnavailable) {
-		g.logger.Warn(
-			g.logger.WithError(context.Background(), err),
-			"generate makrov response error",
-		)
-	}
-
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	randomIndex := g.r.Intn(len(g.messages))
 	return g.messages[randomIndex]
-}
-
-func (g *Generator) generateMarkov() (string, error) {
-	if g.r.Float32() >= g.markovChance {
-		return "", errGenerationUnavailable
-	}
-
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	tokens := []string{gomarkov.StartToken}
-
-	for tokens[len(tokens)-1] != gomarkov.EndToken {
-		next, err := g.chain.Generate(tokens[(len(tokens) - 1):])
-		if err != nil {
-			return "", fmt.Errorf("can't generate next token: %w", err)
-		}
-
-		tokens = append(tokens, next)
-	}
-	return strings.Join(tokens[1:len(tokens)-1], " "), nil
 }
 
 func (g *Generator) generateAi(replyTo string) (string, error) {

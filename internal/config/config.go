@@ -22,7 +22,6 @@ type Config struct {
 	UpdateVoicesPeriod           time.Duration `envconfig:"VOICE_UPDATE_PERIOD"                                 default:"30m"`
 	BullingsUpdateMessagesPeriod time.Duration `envconfig:"BULLINGS_UPDATE_MESSAGES_PERIOD"                     default:"10m"`
 	StickerReactChance           float32       `envconfig:"STICKER_REACTIONS_CHANCE"                            default:"0.4"`
-	BullingsMarkovChance         float32       `envconfig:"BULLINGS_MARKOV_CHANCE"                              default:"0.75"`
 	BullingsAIChance             float32       `envconfig:"BULLINGS_AI_CHANCE"                                  default:"0.75"`
 	VoiceReactChance             float32       `envconfig:"VOICE_REACTIONS_CHANCE"                              default:"0.8"`
 	NicknamesUpdatePerios        time.Duration `envconfig:"NICKNAMES_UPDATE_PERIOD"                             default:"10m"`

@@ -70,7 +70,6 @@ func main() {
 		phraseFilter,
 		ai,
 		cfg.BullingsUpdateMessagesPeriod,
-		cfg.BullingsMarkovChance,
 		cfg.BullingsAIChance,
 	)
 	if err != nil {
