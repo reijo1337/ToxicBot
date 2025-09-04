@@ -25,6 +25,7 @@ type Config struct {
 	BullingsAIChance             float32       `envconfig:"BULLINGS_AI_CHANCE"                                  default:"0.75"`
 	VoiceReactChance             float32       `envconfig:"VOICE_REACTIONS_CHANCE"                              default:"0.8"`
 	NicknamesUpdatePerios        time.Duration `envconfig:"NICKNAMES_UPDATE_PERIOD"                             default:"10m"`
+	DuckDbFilePath               string        `envconfig:"DUCKDB_FILE_PATH"                    required:"true"`
 }
 
 func Parse() (*Config, error) {

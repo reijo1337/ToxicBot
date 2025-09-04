@@ -8,7 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/reijo1337/ToxicBot/internal/config"
+	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/internal/handlers"
 	"github.com/reijo1337/ToxicBot/internal/handlers/bulling"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_sticker"
@@ -16,21 +19,30 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
 	"github.com/reijo1337/ToxicBot/internal/handlers/personal"
+	"github.com/reijo1337/ToxicBot/internal/handlers/stat"
 	"github.com/reijo1337/ToxicBot/internal/handlers/tagger"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets/google_spreadsheet"
+	"github.com/reijo1337/ToxicBot/internal/infrastructure/storage/db"
 	"github.com/reijo1337/ToxicBot/internal/message"
 	"github.com/reijo1337/ToxicBot/internal/phrase_filter"
 	"github.com/reijo1337/ToxicBot/pkg/logger"
+	"github.com/reijo1337/ToxicBot/pkg/migrator"
 	"gopkg.in/telebot.v3"
 )
+
+var AesKeyString string
 
 func main() {
 	logger := logger.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if AesKeyString == "" {
+		logger.Fatal(ctx, "main.AesKeyString must be passed in -ldflags build flag")
+	}
 
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -41,6 +53,28 @@ func main() {
 			"can't init config",
 		)
 	}
+
+	if err := migrator.MigrateDB(cfg.DuckDbFilePath); err != nil {
+		logger.Fatal(logger.WithError(ctx, err), "failed to migrate db")
+	}
+
+	dbpool, err := sqlx.Open("duckdb", cfg.DuckDbFilePath)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"failed to open database",
+		)
+	}
+
+	if err := dbpool.Ping(); err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"failed to ping database",
+		)
+	}
+
+	connGetter := db.NewConnGetter(dbpool)
+	responseLogStorage := db.NewResponseLogStorage(connGetter)
 
 	gs, err := google_spreadsheet.New(ctx)
 	if err != nil {
@@ -59,6 +93,14 @@ func main() {
 		logger.Fatal(
 			logger.WithError(ctx, err),
 			"can't create deepseek client",
+		)
+	}
+
+	stats, err := stats.New(AesKeyString, responseLogStorage, logger)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't init stats",
 		)
 	}
 
@@ -101,7 +143,13 @@ func main() {
 		)
 	}
 
-	igorHandler, err := personal.New("igor", sheetsRepository.GetPersonal("igor"), 750)
+	igorHandler, err := personal.New(
+		ctx,
+		"igor",
+		sheetsRepository.GetPersonal("igor"),
+		stats,
+		750,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -109,7 +157,13 @@ func main() {
 		)
 	}
 
-	maxHandler, err := personal.New("max", sheetsRepository.GetPersonal("max"), 200)
+	maxHandler, err := personal.New(
+		ctx,
+		"max",
+		sheetsRepository.GetPersonal("max"),
+		stats,
+		200,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -117,7 +171,13 @@ func main() {
 		)
 	}
 
-	kirillHandler, err := personal.New("kirill", sheetsRepository.GetPersonal("kirill"), 150)
+	kirillHandler, err := personal.New(
+		ctx,
+		"kirill",
+		sheetsRepository.GetPersonal("kirill"),
+		stats,
+		150,
+	)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -128,6 +188,7 @@ func main() {
 	bullingHandler, err := bulling.New(
 		ctx,
 		generator,
+		stats,
 		cfg.ThresholdCount,
 		cfg.ThresholdTime,
 		cfg.Cooldown,
@@ -144,6 +205,7 @@ func main() {
 		sheetsRepository,
 		logger,
 		random,
+		stats,
 		cfg.UpdateMessagesPeriod,
 	)
 	if err != nil {
@@ -169,6 +231,7 @@ func main() {
 		sheetsRepository,
 		logger,
 		random,
+		stats,
 		stickersFromPacks,
 		cfg.StickerReactChance,
 		cfg.UpdateStickersPeriod,
@@ -185,6 +248,7 @@ func main() {
 		sheetsRepository,
 		logger,
 		random,
+		stats,
 		cfg.VoiceReactChance,
 		cfg.UpdateVoicesPeriod,
 		b,
@@ -203,6 +267,7 @@ func main() {
 		b,
 		logger,
 		random,
+		stats,
 		cfg.TaggerIntervalFrom,
 		cfg.TaggerIntervalTo,
 		cfg.NicknamesUpdatePerios,
@@ -214,7 +279,7 @@ func main() {
 		)
 	}
 
-	onLeft := on_user_left.New()
+	onLeft := on_user_left.New(ctx, stats)
 
 	b.Handle(
 		telebot.OnText,
@@ -272,6 +337,8 @@ func main() {
 	)
 
 	b.Handle(telebot.OnMedia, tagger.Handle)
+
+	b.Handle("/stat", stat.New(ctx, responseLogStorage).Handle)
 
 	go func() {
 		logger.Info(

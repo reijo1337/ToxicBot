@@ -1,6 +1,5 @@
-FROM alpine:3.13
+FROM scratch
 
 COPY bot bot
-COPY data/ data/
 
-CMD "./bot"
+CMD ["./bot"]

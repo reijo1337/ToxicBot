@@ -9,12 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
 )
 
 type Handler struct {
+	ctx        context.Context
 	generator  messageGenerator
+	statIncer  statIncer
 	r          *rand.Rand
 	msgCount   map[string]*list.List
 	cooldown   map[string]time.Time
@@ -29,12 +32,15 @@ type Handler struct {
 func New(
 	ctx context.Context,
 	generator messageGenerator,
+	statIncer statIncer,
 	thresholdCount int,
 	thresholdTime time.Duration,
 	cooldownTime time.Duration,
 ) (*Handler, error) {
 	return &Handler{
+		ctx:       ctx,
 		generator: generator,
+		statIncer: statIncer,
 		msgCount:  make(map[string]*list.List),
 		cooldown:  make(map[string]time.Time),
 		r:         rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -74,12 +80,20 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 
 	text := b.generator.GetMessageText(ctx.Message().Text)
 
+	go b.statIncer.Inc(
+		b.ctx,
+		chat.ID,
+		user.ID,
+		stats.OnTextOperationType,
+		stats.WithGenStrategy(text.Strategy),
+	)
+
 	if err := ctx.Notify(telebot.Typing); err != nil {
 		return err
 	}
 	time.Sleep(time.Duration((float64(b.r.Intn(3)) + b.r.Float64()) * 1_000_000_000))
 
-	return ctx.Reply(text)
+	return ctx.Reply(text.Message)
 }
 
 func (b *Handler) isCooldown(key string) bool {

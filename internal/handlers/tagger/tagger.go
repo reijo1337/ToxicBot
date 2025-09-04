@@ -4,9 +4,11 @@ import (
 	"container/heap"
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"gopkg.in/telebot.v3"
 )
 
@@ -19,10 +21,12 @@ func (c chat) Recipient() string {
 }
 
 type Handler struct {
+	ctx                context.Context
 	generator          messageGenerator
 	log                logger
 	random             randomizer
 	nicknameRepository nicknameRepository
+	statIncer          statIncer
 	chatToUsers        map[string][]int64
 	queue              *taggerQueue
 	bot                *telebot.Bot
@@ -41,6 +45,7 @@ func New(
 	bot *telebot.Bot,
 	log logger,
 	random randomizer,
+	statIncer statIncer,
 	nextFrom, nextTo time.Duration,
 	updateNicknames time.Duration,
 ) (*Handler, error) {
@@ -48,10 +53,12 @@ func New(
 		nextFrom, nextTo = nextTo, nextFrom
 	}
 	out := &Handler{
+		ctx:                ctx,
 		generator:          generator,
 		bot:                bot,
 		nicknameRepository: nicknameRepository,
 		log:                log,
+		statIncer:          statIncer,
 		queue:              &taggerQueue{queue: make([]taggerJob, 0, 10)},
 		chatToUsers:        make(map[string][]int64, 10),
 		uniqueUsers:        make(map[string]struct{}, 2_000),
@@ -135,13 +142,19 @@ func (h *Handler) sender(ctx context.Context) {
 		index := h.random.Intn(len(users))
 		user := users[index]
 
+		genResult := h.generator.GetMessageText(prompt)
+
 		text := fmt.Sprintf(
 			"[%s](tg://user?id=%d), %s",
 			nickname,
 			user,
-			h.generator.GetMessageText(prompt),
+			genResult.Message,
 		)
 		h.mu.Unlock()
+
+		chatIDint, _ := strconv.ParseInt(task.chatID, 10, 64)
+
+		go h.statIncer.Inc(h.ctx, chatIDint, user, stats.PersonalOperationType)
 
 		if _, err := h.bot.Send(chat(task.chatID), text, telebot.ModeMarkdown); err != nil {
 			h.log.Warn(
