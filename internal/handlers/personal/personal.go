@@ -1,6 +1,7 @@
 package personal
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
 )
 
@@ -17,7 +20,9 @@ const (
 )
 
 type Handler struct {
+	ctx        context.Context
 	repository messageRepository
+	statIncer  statIncer
 	random     *rand.Rand
 	slug       string
 	id         int64
@@ -25,8 +30,10 @@ type Handler struct {
 }
 
 func New(
+	ctx context.Context,
 	name string,
 	repository messageRepository,
+	statIncer statIncer,
 	chance int,
 ) (*Handler, error) {
 	env := fmt.Sprintf(envFormat, strings.ToUpper(name))
@@ -36,10 +43,12 @@ func New(
 	}
 
 	return &Handler{
+		ctx:        ctx,
 		slug:       fmt.Sprintf(slugFormat, strings.ToLower(name)),
 		id:         id,
 		random:     rand.New(rand.NewSource(time.Now().UnixNano())),
 		repository: repository,
+		statIncer:  statIncer,
 		chance:     chance,
 	}, nil
 }
@@ -64,6 +73,13 @@ func (i *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	if idx := i.random.Intn(len(messages)); idx == 0 {
+		go i.statIncer.Inc(
+			i.ctx,
+			pointer.From(ctx.Chat()).ID,
+			pointer.From(ctx.Sender()).ID,
+			stats.PersonalOperationType,
+		)
+
 		return ctx.Reply(messages[idx])
 	}
 

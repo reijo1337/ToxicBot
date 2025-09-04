@@ -6,14 +6,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
 )
 
 type Handler struct {
+	ctx          context.Context
 	storage      voicesRepository
 	r            randomizer
 	downloader   downloader
 	logger       logger
+	statIncer    statIncer
 	voices       []string
 	muVcs        sync.RWMutex
 	reactChance  float32
@@ -25,14 +29,17 @@ func New(
 	stor voicesRepository,
 	logger logger,
 	r randomizer,
+	statIncer statIncer,
 	reactChance float32,
 	updatePeriod time.Duration,
 	downloader downloader,
 ) (*Handler, error) {
 	out := Handler{
+		ctx:          ctx,
 		storage:      stor,
 		logger:       logger,
 		r:            r,
+		statIncer:    statIncer,
 		reactChance:  reactChance,
 		updatePeriod: updatePeriod,
 		downloader:   downloader,
@@ -58,6 +65,13 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 
 	h.muVcs.RLock()
 	defer h.muVcs.RUnlock()
+
+	go h.statIncer.Inc(
+		h.ctx,
+		pointer.From(ctx.Chat()).ID,
+		pointer.From(ctx.Sender()).ID,
+		stats.OnVoiceOperationType,
+	)
 
 	randomIndex := h.r.Intn(len(h.voices))
 	voiceID := h.voices[randomIndex]

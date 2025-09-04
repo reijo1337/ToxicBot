@@ -20,3 +20,6 @@ imports:
 
 fmt:
 	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.2.2 golangci-lint fmt -v
+
+migration:
+	docker run -v $(PWD)/db/migrations:/migrations migrate/migrate:v4.18.3 create -ext sql -dir /migrations -seq $(name)

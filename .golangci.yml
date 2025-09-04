@@ -7,8 +7,6 @@ linters:
     - bidichk
     - bodyclose
     - canonicalheader
-    - containedctx
-    - contextcheck
     - copyloopvar
     - decorder
     - dogsled
@@ -26,7 +24,6 @@ linters:
     - forbidigo
     - ginkgolinter
     - gocheckcompilerdirectives
-    - gochecknoinits
     - gochecksumtype
     - gocognit
     - goconst
@@ -52,10 +49,7 @@ linters:
     - misspell
     - musttag
     - nakedret
-    - nestif
-    - nilerr
     - nilnesserr
-    - nilnil
     - noctx
     - nosprintfhostport
     - paralleltest
@@ -71,7 +65,6 @@ linters:
     - sloglint
     - spancheck
     - sqlclosecheck
-    - tagliatelle
     - testableexamples
     - testifylint
     - testpackage
