@@ -1,0 +1,36 @@
+name: Deploy reusable
+
+on:
+  workflow_call:
+    inputs:
+      docker_tag:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: deploy to vscale server using ansible
+      uses: dawidd6/action-ansible-playbook@v2
+      with:
+        playbook: deploy.yaml
+        directory: deploy/
+        key: ${{secrets.SSH_MAMA_KEY}}
+        inventory: |
+          [vscale_host]
+          vscale ansible_host=194.67.205.50 ansible_user=root
+        options: |
+          --extra-vars "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }} 
+          IGOR_ID=${{ secrets.IGOR_ID }}
+          MAX_ID=${{ secrets.MAX_ID }}
+          KIRILL_ID=${{ secrets.KIRILL_ID }}
+          STICKER_SETS=${{ secrets.STICKER_SETS != '' && secrets.STICKER_SETS || 'static_bulling_by_stickersthiefbot' }}
+          GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SPREADSHEET_ID=${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+          DOCKER_TAG=${{ inputs.docker_tag }}"
+          -vvvv
+

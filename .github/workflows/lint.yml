@@ -1,6 +1,6 @@
-name: lint
+name: Lint Reusable
 
-on: [push]
+on: [workflow_call]
 
 jobs:
   golangci:

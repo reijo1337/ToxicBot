@@ -9,7 +9,7 @@
     - name: Create and start a container
       community.docker.docker_container:
         name: "ToxicBot"
-        image: "docker.io/32133789756/toxicbot:latest"
+        image: "docker.io/32133789756/toxicbot:{{ DOCKER_TAG }}"
         pull: yes
         state: started
         recreate: yes

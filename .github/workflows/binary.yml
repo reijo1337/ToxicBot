@@ -1,0 +1,38 @@
+name: Binary reusable
+
+on: 
+  workflow_call:
+    inputs:
+      binary_name:
+        required: true
+        type: string
+      artifact_name:
+        required: true
+        type: string
+
+jobs:
+  binary:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Download modules
+      run: go mod download
+
+    - name: Build
+      run: GOOS=linux GOARCH=amd64 go build -o ${{ inputs.binary_name }} -ldflags="-X main.AesKeyString=${{ secrets.AES_KEY }} -extldflags \"-static\"" -tags timetzdata cmd/main.go
+
+    - name: Test
+      run: go test -race -v ./...
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.binary_name }}
