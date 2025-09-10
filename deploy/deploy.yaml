@@ -6,14 +6,21 @@
   become_user: root
   hosts: vscale_host
   tasks:
+    - name: Create db folder
+      ansible.builtin.file:
+        path: /srv/ToxicBot/db
+        state: directory
+
     - name: Create and start a container
       community.docker.docker_container:
         name: "ToxicBot"
-        image: "docker.io/32133789756/toxicbot:latest"
+        image: "docker.io/32133789756/toxicbot:{{ DOCKER_TAG }}"
         pull: yes
         state: started
         recreate: yes
         restart_policy: always
+        volumes:
+          - "/srv/ToxicBot/db:/db"
         env:
           TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
           IGOR_ID: "{{ IGOR_ID }}"
@@ -25,6 +32,7 @@
           DEEPSEEK_API_KEY: "{{ DEEPSEEK_API_KEY }}"
           BULLINGS_THRESHOLD_COUNT: "2"
           BULLINGS_THRESHOLD_TIME: "5m"
+          DUCKDB_FILE_PATH: "/db/sas.db"
 
     - name: Prune unused imagages
       community.docker.docker_prune:
