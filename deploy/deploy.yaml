@@ -20,7 +20,7 @@
         recreate: yes
         restart_policy: always
         volumes:
-          - "/srv/ToxicBot/db:/db"
+          - "/srv/ToxicBot/db:/toxicdb"
         env:
           TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
           IGOR_ID: "{{ IGOR_ID }}"
@@ -32,7 +32,7 @@
           DEEPSEEK_API_KEY: "{{ DEEPSEEK_API_KEY }}"
           BULLINGS_THRESHOLD_COUNT: "2"
           BULLINGS_THRESHOLD_TIME: "5m"
-          DUCKDB_FILE_PATH: "/db/sas.db"
+          DUCKDB_FILE_PATH: "/toxicdb/sas.db"
 
     - name: Prune unused imagages
       community.docker.docker_prune:
