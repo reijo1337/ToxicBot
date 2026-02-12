@@ -57,7 +57,7 @@ jobs:
         -e GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS }} \
         -e GOOGLE_SPREADSHEET_ID=${{ secrets.GOOGLE_SPREADSHEET_ID }} \
         -e DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }} \
-        -e DUCKDB_FILE_PATH=test.db \
+        -e SQLITE_FILE_PATH=test.db \
         --rm test-tag || [ $? -eq 124 ]
 
     - name: Build and push

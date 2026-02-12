@@ -2,13 +2,13 @@ package db
 
 import (
 	"database/sql/driver"
-	"errors"
+	"fmt"
 
 	jsonlib "github.com/goccy/go-json"
 )
 
 type json interface {
-	*responseLogExtra
+	*responseLogExtra | map[string]uint64
 }
 
 type JSON[T json] struct {
@@ -28,9 +28,14 @@ func (a *JSON[T]) Scan(value any) error {
 		return nil
 	}
 
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+	var b []byte
+	switch v := value.(type) {
+	case []byte:
+		b = v
+	case string:
+		b = []byte(v)
+	default:
+		return fmt.Errorf("unsupported type for JSONMap: %T", value)
 	}
 
 	if len(b) == 0 {

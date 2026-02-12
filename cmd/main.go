@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/marcboeker/go-duckdb/v2"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/reijo1337/ToxicBot/internal/config"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/internal/handlers"
@@ -54,11 +54,11 @@ func main() {
 		)
 	}
 
-	if err := migrator.MigrateDB(cfg.DuckDbFilePath); err != nil {
+	if err := migrator.MigrateDB(cfg.SqliteFilePath); err != nil {
 		logger.Fatal(logger.WithError(ctx, err), "failed to migrate db")
 	}
 
-	dbpool, err := sqlx.Open("duckdb", cfg.DuckDbFilePath)
+	dbpool, err := sqlx.Open("sqlite3", cfg.SqliteFilePath)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
