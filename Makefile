@@ -23,3 +23,6 @@ fmt:
 
 migration:
 	docker run -v $(PWD)/db/migrations:/migrations migrate/migrate:v4.18.3 create -ext sql -dir /migrations -seq $(name)
+
+dozzlepwd:
+	docker run --rm httpd:alpine htpasswd -bnBC 10 "" $(password) | tr -d ':\n'

@@ -35,7 +35,10 @@ import (
 var AesKeyString string
 
 func main() {
-	logger := logger.New()
+	logger := logger.New(
+		logger.WithFormat(logger.JsonFormat),
+		logger.WithReportCaller(true),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

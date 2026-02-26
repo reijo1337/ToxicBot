@@ -1,0 +1,47 @@
+---
+
+- name: Deploy log viewer
+
+  become: yes
+  become_user: root
+  hosts: vscale_host
+
+  vars:
+    dozzle_data_dir: /srv/ToxicBot/dozzle
+    dozzle_username: "{{ lookup('env', 'DOZZLE_USERNAME') }}"
+    dozzle_password_hash: "{{ lookup('env', 'DOZZLE_PASSWORD_HASH') }}"
+
+  tasks:
+    - name: Create Dozzle data directory
+      ansible.builtin.file:
+        path: "{{ dozzle_data_dir }}"
+        state: directory
+        mode: '0750'
+
+    - name: Create Dozzle users config
+      ansible.builtin.copy:
+        dest: "{{ dozzle_data_dir }}/users.yml"
+        mode: '0600'
+        content: |
+          users:
+            {{ dozzle_username }}:
+              name: "{{ dozzle_username }}"
+              password: "{{ dozzle_password_hash }}"
+              email: admin@localhost
+
+    - name: Create and start Dozzle container
+      community.docker.docker_container:
+        name: "ToxicBot-Dozzle"
+        image: "amir20/dozzle:latest"
+        pull: yes
+        state: started
+        recreate: yes
+        restart_policy: always
+        ports:
+          - "8888:8080"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock"
+          - "{{ dozzle_data_dir }}:/data"
+        env:
+          DOZZLE_AUTH_PROVIDER: "simple"
+          DOZZLE_NO_ANALYTICS: "true"

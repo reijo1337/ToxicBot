@@ -55,7 +55,7 @@ func WithFormat(format Format) Option {
 	}
 }
 
-func WithReposrtCaller(reportCaller bool) Option {
+func WithReportCaller(reportCaller bool) Option {
 	return func(o *options) {
 		o.reportCaller = &reportCaller
 	}

@@ -1,0 +1,24 @@
+name: Deploy log viewer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Deploy Dozzle log viewer
+        uses: dawidd6/action-ansible-playbook@v2
+        env:
+          DOZZLE_USERNAME: ${{ secrets.DOZZLE_USERNAME }}
+          DOZZLE_PASSWORD_HASH: ${{ secrets.DOZZLE_PASSWORD_HASH }}
+        with:
+          playbook: deploy-logs.yaml
+          directory: deploy/
+          key: ${{ secrets.SSH_MAMA_KEY }}
+          inventory: |
+            [vscale_host]
+            vscale ansible_host=194.67.205.50 ansible_user=root
