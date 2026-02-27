@@ -9,45 +9,42 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
 )
 
-type Handler struct {
-	ctx        context.Context
-	generator  messageGenerator
-	statIncer  statIncer
-	r          *rand.Rand
-	msgCount   map[string]*list.List
-	cooldown   map[string]time.Time
-	muCount    sync.Mutex
-	muCooldown sync.Mutex
+type settingsProvider interface {
+	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
+}
 
-	thresholdCount int
-	thresholdTime  time.Duration
-	cooldownTime   time.Duration
+type Handler struct {
+	ctx              context.Context
+	generator        messageGenerator
+	statIncer        statIncer
+	settingsProvider settingsProvider
+	r                *rand.Rand
+	msgCount         map[string]*list.List
+	cooldown         map[string]time.Time
+	muCount          sync.Mutex
+	muCooldown       sync.Mutex
 }
 
 func New(
 	ctx context.Context,
 	generator messageGenerator,
 	statIncer statIncer,
-	thresholdCount int,
-	thresholdTime time.Duration,
-	cooldownTime time.Duration,
+	settingsProvider settingsProvider,
 ) (*Handler, error) {
 	return &Handler{
-		ctx:       ctx,
-		generator: generator,
-		statIncer: statIncer,
-		msgCount:  make(map[string]*list.List),
-		cooldown:  make(map[string]time.Time),
-		r:         rand.New(rand.NewSource(time.Now().UnixNano())),
-
-		thresholdCount: thresholdCount,
-		thresholdTime:  thresholdTime,
-		cooldownTime:   cooldownTime,
+		ctx:              ctx,
+		generator:        generator,
+		statIncer:        statIncer,
+		settingsProvider: settingsProvider,
+		msgCount:         make(map[string]*list.List),
+		cooldown:         make(map[string]time.Time),
+		r:                rand.New(rand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
@@ -63,10 +60,20 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
+	settings, err := b.settingsProvider.GetForChat(b.ctx, chat.ID)
+	if err != nil {
+		return fmt.Errorf("can't get chat settings: %w", err)
+	}
+
 	key := fmt.Sprintf("%d:%d", chat.ID, user.ID)
 
 	isCooldown := b.isCooldown(key)
-	isMsgThreshold := b.isMsgThreshold(key, ctx.Message().Time())
+	isMsgThreshold := b.isMsgThreshold(
+		key,
+		ctx.Message().Time(),
+		settings.ThresholdCount,
+		settings.ThresholdTime,
+	)
 	isReplyOrMention := isReplyOrMention(ctx)
 
 	if !isReplyOrMention {
@@ -76,9 +83,9 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	// КД на булинг
-	b.setCooldown(key)
+	b.setCooldown(key, settings.Cooldown)
 
-	text := b.generator.GetMessageText(ctx.Message().Text)
+	text := b.generator.GetMessageText(ctx.Message().Text, settings.AIChance)
 
 	go b.statIncer.Inc(
 		b.ctx,
@@ -113,13 +120,18 @@ func (b *Handler) isCooldown(key string) bool {
 	return true
 }
 
-func (b *Handler) setCooldown(key string) {
+func (b *Handler) setCooldown(key string, cooldownTime time.Duration) {
 	b.muCooldown.Lock()
-	b.cooldown[key] = time.Now().Add(b.cooldownTime)
+	b.cooldown[key] = time.Now().Add(cooldownTime)
 	b.muCooldown.Unlock()
 }
 
-func (b *Handler) isMsgThreshold(key string, msgTime time.Time) bool {
+func (b *Handler) isMsgThreshold(
+	key string,
+	msgTime time.Time,
+	thresholdCount int,
+	thresholdTime time.Duration,
+) bool {
 	b.muCount.Lock()
 	defer b.muCount.Unlock()
 
@@ -136,12 +148,12 @@ func (b *Handler) isMsgThreshold(key string, msgTime time.Time) bool {
 		next = e.Next()
 		t := e.Value.(time.Time)
 
-		if time.Since(t) > b.thresholdTime {
+		if time.Since(t) > thresholdTime {
 			b.msgCount[key].Remove(e)
 		}
 	}
 
-	return b.msgCount[key].Len() >= b.thresholdCount
+	return b.msgCount[key].Len() >= thresholdCount
 }
 
 func isReplyOrMention(ctx telebot.Context) bool {

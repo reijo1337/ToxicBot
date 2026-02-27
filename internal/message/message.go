@@ -42,7 +42,6 @@ type Generator struct {
 	systemPrompt      string
 	updatePeriod      time.Duration
 	mu                sync.RWMutex
-	aiChance          float32
 }
 
 func New(
@@ -53,7 +52,6 @@ func New(
 	meaningfullFilter meaningfullFilter,
 	ai ai,
 	updatePeriod time.Duration,
-	aiChance float32,
 ) (*Generator, error) {
 	out := Generator{
 		storage:           s,
@@ -62,7 +60,6 @@ func New(
 		meaningfullFilter: meaningfullFilter,
 		ai:                ai,
 		updatePeriod:      updatePeriod,
-		aiChance:          aiChance,
 	}
 
 	if err := out.reloadMessages(); err != nil {
@@ -117,8 +114,8 @@ func (g *Generator) reloadMessages() error {
 	return nil
 }
 
-func (g *Generator) GetMessageText(replyTo string) GenerationResult {
-	text, err := g.generateAi(replyTo)
+func (g *Generator) GetMessageText(replyTo string, aiChance float32) GenerationResult {
+	text, err := g.generateAi(replyTo, aiChance)
 	if err == nil {
 		return GenerationResult{
 			Message:  text,
@@ -141,8 +138,8 @@ func (g *Generator) GetMessageText(replyTo string) GenerationResult {
 	}
 }
 
-func (g *Generator) generateAi(replyTo string) (string, error) {
-	if g.r.Float32() >= g.aiChance {
+func (g *Generator) generateAi(replyTo string, aiChance float32) (string, error) {
+	if g.r.Float32() >= aiChance {
 		return "", errGenerationUnavailable
 	}
 

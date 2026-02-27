@@ -6,10 +6,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
 )
+
+type settingsProvider interface {
+	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
+}
 
 type StickerReactions struct {
 	ctx                  context.Context
@@ -17,10 +22,10 @@ type StickerReactions struct {
 	r                    randomizer
 	logger               logger
 	statIncer            statIncer
+	settingsProvider     settingsProvider
 	stickers             []string
 	stickersFromPacks    []string
 	muStk                sync.RWMutex
-	reactChance          float32
 	updateStickersPeriod time.Duration
 }
 
@@ -31,7 +36,7 @@ func New(
 	r randomizer,
 	statIncer statIncer,
 	stickersFromPacks []string,
-	reactChance float32,
+	settingsProvider settingsProvider,
 	updateStickersPeriod time.Duration,
 ) (*StickerReactions, error) {
 	out := StickerReactions{
@@ -41,7 +46,7 @@ func New(
 		stickersFromPacks:    stickersFromPacks,
 		r:                    r,
 		statIncer:            statIncer,
-		reactChance:          reactChance,
+		settingsProvider:     settingsProvider,
 		updateStickersPeriod: updateStickersPeriod,
 	}
 
@@ -59,7 +64,14 @@ func (*StickerReactions) Slug() string {
 }
 
 func (sr *StickerReactions) Handle(ctx telebot.Context) error {
-	if sr.r.Float32() > sr.reactChance {
+	chat := pointer.From(ctx.Chat())
+
+	settings, err := sr.settingsProvider.GetForChat(sr.ctx, chat.ID)
+	if err != nil {
+		return fmt.Errorf("can't get chat settings: %w", err)
+	}
+
+	if sr.r.Float32() > settings.StickerReactChance {
 		return nil
 	}
 
@@ -74,7 +86,7 @@ func (sr *StickerReactions) Handle(ctx telebot.Context) error {
 
 	go sr.statIncer.Inc(
 		sr.ctx,
-		pointer.From(ctx.Chat()).ID,
+		chat.ID,
 		pointer.From(ctx.Sender()).ID,
 		stats.OnStickerOperationType,
 	)

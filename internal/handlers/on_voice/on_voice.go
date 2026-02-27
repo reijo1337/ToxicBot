@@ -6,22 +6,27 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
 )
 
+type settingsProvider interface {
+	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
+}
+
 type Handler struct {
-	ctx          context.Context
-	storage      voicesRepository
-	r            randomizer
-	downloader   downloader
-	logger       logger
-	statIncer    statIncer
-	voices       []string
-	muVcs        sync.RWMutex
-	reactChance  float32
-	updatePeriod time.Duration
+	ctx              context.Context
+	storage          voicesRepository
+	r                randomizer
+	downloader       downloader
+	logger           logger
+	statIncer        statIncer
+	settingsProvider settingsProvider
+	voices           []string
+	muVcs            sync.RWMutex
+	updatePeriod     time.Duration
 }
 
 func New(
@@ -30,19 +35,19 @@ func New(
 	logger logger,
 	r randomizer,
 	statIncer statIncer,
-	reactChance float32,
+	settingsProvider settingsProvider,
 	updatePeriod time.Duration,
 	downloader downloader,
 ) (*Handler, error) {
 	out := Handler{
-		ctx:          ctx,
-		storage:      stor,
-		logger:       logger,
-		r:            r,
-		statIncer:    statIncer,
-		reactChance:  reactChance,
-		updatePeriod: updatePeriod,
-		downloader:   downloader,
+		ctx:              ctx,
+		storage:          stor,
+		logger:           logger,
+		r:                r,
+		statIncer:        statIncer,
+		settingsProvider: settingsProvider,
+		updatePeriod:     updatePeriod,
+		downloader:       downloader,
 	}
 
 	if err := out.reloadVoices(); err != nil {
@@ -59,7 +64,14 @@ func (h *Handler) Slug() string {
 }
 
 func (h *Handler) Handle(ctx telebot.Context) error {
-	if h.r.Float32() > h.reactChance {
+	chat := pointer.From(ctx.Chat())
+
+	settings, err := h.settingsProvider.GetForChat(h.ctx, chat.ID)
+	if err != nil {
+		return fmt.Errorf("can't get chat settings: %w", err)
+	}
+
+	if h.r.Float32() > settings.VoiceReactChance {
 		return nil
 	}
 
@@ -68,7 +80,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 
 	go h.statIncer.Inc(
 		h.ctx,
-		pointer.From(ctx.Chat()).ID,
+		chat.ID,
 		pointer.From(ctx.Sender()).ID,
 		stats.OnVoiceOperationType,
 	)

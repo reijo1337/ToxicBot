@@ -10,6 +10,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/reijo1337/ToxicBot/internal/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/config"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/internal/handlers"
@@ -19,6 +20,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_voice"
 	"github.com/reijo1337/ToxicBot/internal/handlers/personal"
+	"github.com/reijo1337/ToxicBot/internal/handlers/settings"
 	"github.com/reijo1337/ToxicBot/internal/handlers/stat"
 	"github.com/reijo1337/ToxicBot/internal/handlers/tagger"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
@@ -78,6 +80,7 @@ func main() {
 
 	connGetter := db.NewConnGetter(dbpool)
 	responseLogStorage := db.NewResponseLogStorage(connGetter)
+	chatSettingsStorage := db.NewChatSettingsStorage(connGetter)
 
 	gs, err := google_spreadsheet.New(ctx)
 	if err != nil {
@@ -99,7 +102,7 @@ func main() {
 		)
 	}
 
-	stats, err := stats.New(AesKeyString, responseLogStorage, logger)
+	statsIncer, err := stats.New(AesKeyString, responseLogStorage, logger)
 	if err != nil {
 		logger.Fatal(
 			logger.WithError(ctx, err),
@@ -115,7 +118,6 @@ func main() {
 		phraseFilter,
 		ai,
 		cfg.BullingsUpdateMessagesPeriod,
-		cfg.BullingsAIChance,
 	)
 	if err != nil {
 		logger.Fatal(
@@ -123,6 +125,17 @@ func main() {
 			"can't create random text generator",
 		)
 	}
+
+	settingsDefaults := chatsettings.Defaults{
+		ThresholdCount:     cfg.ThresholdCount,
+		ThresholdTime:      cfg.ThresholdTime,
+		Cooldown:           cfg.Cooldown,
+		StickerReactChance: cfg.StickerReactChance,
+		VoiceReactChance:   cfg.VoiceReactChance,
+		AIChance:           cfg.BullingsAIChance,
+	}
+
+	settingsProvider := chatsettings.NewProvider(chatSettingsStorage, settingsDefaults)
 
 	pref := telebot.Settings{
 		Token:  cfg.TelegramToken,
@@ -150,7 +163,7 @@ func main() {
 		ctx,
 		"igor",
 		sheetsRepository.GetPersonal("igor"),
-		stats,
+		statsIncer,
 		750,
 	)
 	if err != nil {
@@ -164,7 +177,7 @@ func main() {
 		ctx,
 		"max",
 		sheetsRepository.GetPersonal("max"),
-		stats,
+		statsIncer,
 		200,
 	)
 	if err != nil {
@@ -178,7 +191,7 @@ func main() {
 		ctx,
 		"kirill",
 		sheetsRepository.GetPersonal("kirill"),
-		stats,
+		statsIncer,
 		150,
 	)
 	if err != nil {
@@ -191,10 +204,8 @@ func main() {
 	bullingHandler, err := bulling.New(
 		ctx,
 		generator,
-		stats,
-		cfg.ThresholdCount,
-		cfg.ThresholdTime,
-		cfg.Cooldown,
+		statsIncer,
+		settingsProvider,
 	)
 	if err != nil {
 		logger.Fatal(
@@ -208,7 +219,7 @@ func main() {
 		sheetsRepository,
 		logger,
 		random,
-		stats,
+		statsIncer,
 		cfg.UpdateMessagesPeriod,
 	)
 	if err != nil {
@@ -234,9 +245,9 @@ func main() {
 		sheetsRepository,
 		logger,
 		random,
-		stats,
+		statsIncer,
 		stickersFromPacks,
-		cfg.StickerReactChance,
+		settingsProvider,
 		cfg.UpdateStickersPeriod,
 	)
 	if err != nil {
@@ -251,8 +262,8 @@ func main() {
 		sheetsRepository,
 		logger,
 		random,
-		stats,
-		cfg.VoiceReactChance,
+		statsIncer,
+		settingsProvider,
 		cfg.UpdateVoicesPeriod,
 		b,
 	)
@@ -263,14 +274,15 @@ func main() {
 		)
 	}
 
-	tagger, err := tagger.New(
+	taggerHandler, err := tagger.New(
 		ctx,
 		generator,
 		sheetsRepository,
 		b,
 		logger,
 		random,
-		stats,
+		statsIncer,
+		settingsProvider,
 		cfg.TaggerIntervalFrom,
 		cfg.TaggerIntervalTo,
 		cfg.NicknamesUpdatePerios,
@@ -282,7 +294,7 @@ func main() {
 		)
 	}
 
-	onLeft := on_user_left.New(ctx, stats)
+	onLeft := on_user_left.New(ctx, statsIncer)
 
 	b.Handle(
 		telebot.OnText,
@@ -291,7 +303,7 @@ func main() {
 			igorHandler,
 			maxHandler,
 			bullingHandler,
-			tagger,
+			taggerHandler,
 			kirillHandler,
 		).Handle,
 	)
@@ -304,7 +316,7 @@ func main() {
 			igorHandler,
 			maxHandler,
 			bullingHandler,
-			tagger,
+			taggerHandler,
 			kirillHandler,
 		).Handle,
 	)
@@ -316,7 +328,7 @@ func main() {
 			onVoice,
 			igorHandler,
 			maxHandler,
-			tagger,
+			taggerHandler,
 			kirillHandler,
 		).Handle,
 	)
@@ -326,7 +338,7 @@ func main() {
 		handlers.New(
 			telebot.OnUserJoined,
 			greetingsHandler,
-			tagger.OnJoin(),
+			taggerHandler.OnJoin(),
 		).Handle,
 	)
 
@@ -335,13 +347,14 @@ func main() {
 		handlers.New(
 			telebot.OnUserLeft,
 			onLeft,
-			tagger.OnLeft(),
+			taggerHandler.OnLeft(),
 		).Handle,
 	)
 
-	b.Handle(telebot.OnMedia, tagger.Handle)
+	b.Handle(telebot.OnMedia, taggerHandler.Handle)
 
 	b.Handle("/stat", stat.New(ctx, responseLogStorage).Handle)
+	b.Handle("/settings", settings.New(settingsProvider, settingsDefaults).Handle)
 
 	go func() {
 		logger.Info(

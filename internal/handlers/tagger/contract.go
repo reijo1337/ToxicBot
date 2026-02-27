@@ -13,7 +13,7 @@ type nicknameRepository interface {
 }
 
 type messageGenerator interface {
-	GetMessageText(prompt string) message.GenerationResult
+	GetMessageText(prompt string, aiChance float32) message.GenerationResult
 }
 
 type logger interface {

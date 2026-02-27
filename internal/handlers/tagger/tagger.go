@@ -8,9 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reijo1337/ToxicBot/internal/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"gopkg.in/telebot.v3"
 )
+
+type settingsProvider interface {
+	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
+}
 
 const prompt = "Придумай внезапное оскорбление для участника чата"
 
@@ -27,6 +32,7 @@ type Handler struct {
 	random             randomizer
 	nicknameRepository nicknameRepository
 	statIncer          statIncer
+	settingsProvider   settingsProvider
 	chatToUsers        map[string][]int64
 	queue              *taggerQueue
 	bot                *telebot.Bot
@@ -46,6 +52,7 @@ func New(
 	log logger,
 	random randomizer,
 	statIncer statIncer,
+	settingsProvider settingsProvider,
 	nextFrom, nextTo time.Duration,
 	updateNicknames time.Duration,
 ) (*Handler, error) {
@@ -59,6 +66,7 @@ func New(
 		nicknameRepository: nicknameRepository,
 		log:                log,
 		statIncer:          statIncer,
+		settingsProvider:   settingsProvider,
 		queue:              &taggerQueue{queue: make([]taggerJob, 0, 10)},
 		chatToUsers:        make(map[string][]int64, 10),
 		uniqueUsers:        make(map[string]struct{}, 2_000),
@@ -142,7 +150,14 @@ func (h *Handler) sender(ctx context.Context) {
 		index := h.random.Intn(len(users))
 		user := users[index]
 
-		genResult := h.generator.GetMessageText(prompt)
+		chatIDint, _ := strconv.ParseInt(task.chatID, 10, 64)
+
+		var aiChance float32
+		if s, err := h.settingsProvider.GetForChat(h.ctx, chatIDint); err == nil {
+			aiChance = s.AIChance
+		}
+
+		genResult := h.generator.GetMessageText(prompt, aiChance)
 
 		text := fmt.Sprintf(
 			"[%s](tg://user?id=%d), %s",
@@ -151,8 +166,6 @@ func (h *Handler) sender(ctx context.Context) {
 			genResult.Message,
 		)
 		h.mu.Unlock()
-
-		chatIDint, _ := strconv.ParseInt(task.chatID, 10, 64)
 
 		go h.statIncer.Inc(h.ctx, chatIDint, user, stats.PersonalOperationType)
 

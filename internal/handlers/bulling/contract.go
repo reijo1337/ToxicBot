@@ -9,7 +9,7 @@ import (
 )
 
 type messageGenerator interface {
-	GetMessageText(replyTo string) message.GenerationResult
+	GetMessageText(replyTo string, aiChance float32) message.GenerationResult
 }
 
 type statIncer interface {
