@@ -315,7 +315,6 @@ func main() {
 			stickersReactionHandler,
 			igorHandler,
 			maxHandler,
-			bullingHandler,
 			taggerHandler,
 			kirillHandler,
 		).Handle,

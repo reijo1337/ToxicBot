@@ -184,29 +184,39 @@ func (g *Generator) generateAiWithHistory(
 		return "", errGenerationUnavailable
 	}
 
-	var historyText strings.Builder
+	systemPromptBuilder := strings.Builder{}
+	g.mu.RLock()
+	systemPromptBuilder.WriteString(g.systemPrompt)
+	g.mu.RUnlock()
+
+	systemPromptBuilder.WriteString(
+		"\nДля лучшего формирования ответа воспользуйся историей чата:\n",
+	)
+
 	for _, msg := range history {
-		historyText.WriteString(msg.Author)
-		historyText.WriteString(": ")
-		historyText.WriteString(msg.Text)
-		historyText.WriteByte('\n')
+		systemPromptBuilder.WriteString("Пользователь")
+		systemPromptBuilder.WriteString(msg.Author)
+		systemPromptBuilder.WriteString("написал : ")
+		systemPromptBuilder.WriteString(msg.Text)
+		systemPromptBuilder.WriteByte('\n')
 	}
 
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	userPromptBuilder := strings.Builder{}
 
-	systemPrompt := g.systemPrompt + "\nТы отвечаешь пользователю " + replyTo.Author + "."
-	systemPrompt += "\nИстория чата:\n" + historyText.String()
+	userPromptBuilder.WriteString("\nОтветь пользователю ")
+	userPromptBuilder.WriteString(replyTo.Author)
+	userPromptBuilder.WriteString("на сообщение: ")
+	userPromptBuilder.WriteString(replyTo.Text)
 
 	return g.ai.Chat(
 		context.Background(),
 		deepseek.ChatMessage{
 			Role:    deepseek.RoleSystem,
-			Content: systemPrompt,
+			Content: systemPromptBuilder.String(),
 		},
 		deepseek.ChatMessage{
 			Role:    deepseek.RoleUser,
-			Content: replyTo.Text,
+			Content: userPromptBuilder.String(),
 		},
 	)
 }

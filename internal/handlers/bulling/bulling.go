@@ -16,7 +16,7 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-const historyBufferSize = 20
+const historyBufferSize = 50
 
 type chatMessage struct {
 	Author string
@@ -74,6 +74,9 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 	author := user.FirstName
 	if user.Username != "" {
 		author = "@" + user.Username
+	}
+	if user.IsBot {
+		author = "Админ какого-то канала"
 	}
 
 	b.addToHistory(chat.ID, author, ctx.Message().Text)

@@ -213,7 +213,16 @@ func (h *Handler) Slug() string {
 func (h *Handler) Handle(ctx telebot.Context) error {
 	chat := ctx.Chat()
 	user := ctx.Sender()
-	if chat == nil || user == nil {
+	member, err := h.bot.ChatMemberOf(chat, user)
+	if err != nil {
+		return fmt.Errorf("can't check if user is member of chat: %w", err)
+	}
+
+	if chat == nil ||
+		user == nil ||
+		member == nil ||
+		member.Role == telebot.Left ||
+		member.Role == telebot.Kicked {
 		return nil
 	}
 
@@ -223,6 +232,10 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 }
 
 func (h *Handler) addChatInfo(chat string, user *telebot.User) {
+	if user.IsBot {
+		return
+	}
+
 	key := fmt.Sprintf("%s:%d", chat, user.ID)
 
 	h.mu.Lock()
