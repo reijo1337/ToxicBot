@@ -11,6 +11,7 @@ import (
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
+	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
@@ -67,13 +68,7 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
-	author := user.FirstName
-	if user.Username != "" {
-		author = "@" + user.Username
-	}
-	if user.IsBot {
-		author = "Админ какого-то канала"
-	}
+	author := message.SanitizeAuthor(user.Username, user.FirstName, user.ID, user.IsBot)
 
 	msg := ctx.Message()
 	replyToID := 0
