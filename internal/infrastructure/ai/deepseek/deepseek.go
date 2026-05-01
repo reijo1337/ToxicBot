@@ -18,7 +18,7 @@ type Client struct {
 	model string
 }
 
-const defaultModel = "deepseek-chat"
+const defaultModel = "deepseek-v4-flash"
 
 func New() (*Client, error) {
 	cfg, err := parseConfig()

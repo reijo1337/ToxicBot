@@ -71,9 +71,66 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	assert.Equal(t, RoleUser, captured[1].Role)
 	assert.Equal(t, RoleAssistant, captured[2].Role)
 	assert.Equal(t, "бот", captured[2].Name)
+	assert.Equal(t, "отвали", captured[2].Content,
+		"bot entry must be bare sanitized text without <msg> envelope")
 	assert.Equal(t, RoleUser, captured[3].Role)
 	assert.Equal(t, "@alice", captured[3].Name)
 	assert.Equal(t, `<msg time="2026-04-24T14:00" reply_to="бот">йо</msg>`, captured[3].Content)
+}
+
+func TestGenerator_GetMessageText_StripsOutputMsgEnvelope(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	aiMock := NewMockai(ctrl)
+	rnd := NewMockrandomizer(ctrl)
+	filter := NewMockmeaningfullFilter(ctrl)
+
+	rnd.EXPECT().Float32().Return(float32(0.0))
+	filter.EXPECT().IsMeaningfulPhrase("привет").Return(true)
+	aiMock.EXPECT().
+		Chat(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(`<msg time="2026-05-01T21:24" reply_to="@u">плохой текст</msg>`, nil)
+
+	g := &Generator{
+		r:                 rnd,
+		ai:                aiMock,
+		meaningfullFilter: filter,
+		systemPrompt:      "SYS",
+	}
+
+	res := g.GetMessageText("привет", 1.0)
+
+	assert.Equal(t, AiGenerationStrategy, res.Strategy)
+	assert.Equal(t, "плохой текст", res.Message,
+		"output <msg> envelope must be stripped before returning")
+}
+
+func TestGenerator_WithHistory_StripsOutputMsgEnvelope(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	aiMock := NewMockai(ctrl)
+	rnd := NewMockrandomizer(ctrl)
+	filter := NewMockmeaningfullFilter(ctrl)
+
+	aiMock.EXPECT().
+		Chat(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(`<msg time="2026-05-01T21:24" reply_to="@u">плохой текст</msg>`, nil)
+
+	g := &Generator{
+		r:                 rnd,
+		ai:                aiMock,
+		meaningfullFilter: filter,
+		systemPrompt:      "SYS",
+	}
+
+	history := []chathistory.Entry{{ID: 1, Author: "@alice", Text: "нечто"}}
+	res := g.GetMessageTextWithHistory(history, 0.0, true)
+
+	assert.Equal(t, AiGenerationStrategy, res.Strategy)
+	assert.Equal(t, "плохой текст", res.Message,
+		"output <msg> envelope must be stripped before returning")
 }
 
 func TestGenerator_WithHistory_FallbackOnAiChanceMiss(t *testing.T) {
@@ -234,4 +291,6 @@ func TestSystemPromptBase_DescribesNewMessageEnvelope(t *testing.T) {
 		"system prompt must describe ISO date format")
 	assert.Contains(t, systemPromptBase, "Имя автора передаётся отдельно в поле name сообщения",
 		"system prompt must explicitly tell the model that author goes in the name field")
+	assert.Contains(t, systemPromptBase, "Твой ответ — это просто текст реплики, без обёртки <msg>",
+		"system prompt must explicitly forbid <msg> wrapping in the reply")
 }

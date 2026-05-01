@@ -11,10 +11,15 @@ const (
 	timeLayoutLLM = "2006-01-02T15:04"
 )
 
-// formatUserContent renders one history entry as `<msg time="..." [reply_to="@..."]>текст</msg>`.
-// Authorship travels in LLMMessage.Name. The body is sanitized to defang any
-// nested tag forging or control characters unless the caller marked the entry
-// as PreFormatted (already-XML-formatted bodies produced by the photo handler).
+// formatUserContent renders one user-authored history entry as
+// `<msg time="..." [reply_to="@..."]>текст</msg>`. Authorship travels in
+// LLMMessage.Name. The body is sanitized to defang any nested tag forging or
+// control characters unless the caller marked the entry as PreFormatted
+// (already-XML-formatted bodies produced by the photo handler).
+//
+// NOTE: only user-entries are wrapped in `<msg>`. Bot-entries (FromBot=true)
+// are emitted as bare sanitized text by buildChatCompletions, so that the
+// model does not learn to mirror the envelope back into its own output.
 func formatUserContent(e chathistory.Entry, history []chathistory.Entry) string {
 	var b strings.Builder
 	b.WriteString(`<msg time="`)
@@ -54,13 +59,16 @@ func sanitizeAttr(s string) string {
 
 // buildChatCompletions produces the message envelope for the LLM:
 //
-//	[ system, ...wrapped entries ]
+//	[ system, ...entries ]
 //
-// Both user-Entry and bot-Entry are wrapped in <msg ...>...</msg>; the only
-// difference is Role (User vs Assistant). Authorship is carried in the
-// LLMMessage.Name field, not in the envelope. Leading assistant entries
-// (history that begins with bot output, e.g. tagger-initiated reply after a
-// restart) are skipped — OpenAI-compatible providers do not handle a
+// User-entries (FromBot=false) are wrapped in `<msg ...>...</msg>` via
+// formatUserContent. Bot-entries (FromBot=true) are emitted as BARE sanitized
+// text — this asymmetry is intentional: wrapping past assistant turns in the
+// same envelope teaches the model "my output looks like that" and it starts
+// echoing the wrapper back in its replies. Authorship is carried in the
+// LLMMessage.Name field for both roles. Leading assistant entries (history
+// that begins with bot output, e.g. tagger-initiated reply after a restart)
+// are skipped — OpenAI-compatible providers do not handle a
 // system→assistant→... sequence well.
 func buildChatCompletions(
 	system string,
@@ -76,12 +84,17 @@ func buildChatCompletions(
 		}
 		skipping = false
 
-		role := RoleUser
 		if e.FromBot {
-			role = RoleAssistant
+			msgs = append(msgs, LLMMessage{
+				Role:    RoleAssistant,
+				Name:    e.Author,
+				Content: SanitizeText(e.Text, maxEntryRunes),
+			})
+			continue
 		}
+
 		msgs = append(msgs, LLMMessage{
-			Role:    role,
+			Role:    RoleUser,
 			Name:    e.Author,
 			Content: formatUserContent(e, history),
 		})

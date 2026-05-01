@@ -155,9 +155,9 @@ func TestBuildChatCompletions_BotEntrySanitizedToAssistant(t *testing.T) {
 	assert.Equal(t, "@toxic_bot", msgs[2].Name)
 	assert.Equal(
 		t,
-		`<msg time="2026-05-01T14:01" reply_to="@alice">rude reply</msg>`,
+		`rude reply`,
 		msgs[2].Content,
-		"bot entry must be wrapped in <msg>, body sanitized, reply_to resolved",
+		"bot entry must be bare sanitized text without <msg> envelope",
 	)
 }
 
@@ -192,6 +192,8 @@ func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 	assert.Equal(t, RoleAssistant, msgs[2].Role)
 	assert.Equal(t, RoleUser, msgs[3].Role)
 
+	assert.Equal(t, `rude`, msgs[2].Content,
+		"bot entry must be bare sanitized text without <msg> envelope")
 	assert.Equal(
 		t,
 		`<msg time="2026-05-01T12:02" reply_to="@toxic_bot">back at you</msg>`,

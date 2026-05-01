@@ -76,6 +76,51 @@ func SanitizeAuthor(username, firstName string, userID int64, isBot bool) string
 	return cleaned
 }
 
+// StripOutputMsgEnvelope removes a single outer `<msg ...>...</msg>` wrapper
+// if the model echoes one back. It only strips a balanced outer pair; nested
+// or asymmetric tags are left alone (anti-injection: don't accidentally
+// unwrap user-quoted content).
+func StripOutputMsgEnvelope(s string) string {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return s
+	}
+
+	const closingTag = "</msg>"
+	if !strings.HasSuffix(trimmed, closingTag) {
+		return s
+	}
+
+	// The opening must look like `<msg` followed by either `>` or whitespace.
+	if !strings.HasPrefix(trimmed, "<msg") {
+		return s
+	}
+	if len(trimmed) < len("<msg") {
+		return s
+	}
+	next := trimmed[len("<msg")]
+	if next != '>' && next != ' ' && next != '\t' {
+		return s
+	}
+
+	// Reject nested or repeated wrappers — there must be exactly one opening
+	// `<msg` and one closing `</msg>` in the whole string.
+	if strings.Count(trimmed, "<msg") != 1 {
+		return s
+	}
+	if strings.Count(trimmed, closingTag) != 1 {
+		return s
+	}
+
+	openEnd := strings.IndexByte(trimmed, '>')
+	if openEnd < 0 {
+		return s
+	}
+
+	inner := trimmed[openEnd+1 : len(trimmed)-len(closingTag)]
+	return strings.TrimSpace(inner)
+}
+
 func isStripped(r rune) bool {
 	if r <= 0x1F {
 		return true
