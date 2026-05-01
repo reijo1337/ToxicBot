@@ -300,6 +300,7 @@ func main() {
 		)
 	}
 
+	botAuthorTemp := "@" + b.Me.Username
 	onPhoto := on_photo.New(
 		ctx,
 		gigachatClient,
@@ -312,6 +313,7 @@ func main() {
 		logger,
 		statsIncer,
 		b.Me.ID,
+		botAuthorTemp,
 	)
 
 	taggerHandler, err := tagger.New(

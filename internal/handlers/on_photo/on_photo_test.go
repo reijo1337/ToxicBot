@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	testBotID  = int64(42)
-	testChatID = int64(100)
+	testBotID     = int64(42)
+	testChatID    = int64(100)
+	testBotAuthor = "@toxic_test_bot"
 )
 
 // fakeContext is a minimal telebot.Context stub. Unused methods panic via the
@@ -85,6 +86,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		env.logger,
 		env.statIncer,
 		testBotID,
+		testBotAuthor,
 	)
 	env.handler.r = rand.New(rand.NewSource(0))
 
@@ -175,7 +177,7 @@ func TestHandle_HappyPath_WritesPairViaAddAll(t *testing.T) {
 	assert.False(t, capturedPair[0].FromBot)
 
 	assert.Equal(t, 51, capturedPair[1].ID)
-	assert.Equal(t, "бот", capturedPair[1].Author)
+	assert.Equal(t, testBotAuthor, capturedPair[1].Author)
 	assert.Equal(t, "отвали", capturedPair[1].Text)
 	assert.Equal(t, 50, capturedPair[1].ReplyToID)
 	assert.True(t, capturedPair[1].FromBot)

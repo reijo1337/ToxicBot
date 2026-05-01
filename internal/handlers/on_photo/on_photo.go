@@ -35,6 +35,7 @@ type Handler struct {
 	logger           logger
 	statIncer        statIncer
 	botID            int64
+	botAuthor        string
 	r                *rand.Rand
 	processedGroups  map[string]struct{}
 	muGroups         sync.Mutex
@@ -52,6 +53,7 @@ func New(
 	logger logger,
 	statIncer statIncer,
 	botID int64,
+	botAuthor string,
 ) *Handler {
 	return &Handler{
 		ctx:              ctx,
@@ -65,6 +67,7 @@ func New(
 		logger:           logger,
 		statIncer:        statIncer,
 		botID:            botID,
+		botAuthor:        botAuthor,
 		r:                rand.New(rand.NewSource(time.Now().UnixNano())),
 		processedGroups:  make(map[string]struct{}),
 	}
@@ -188,7 +191,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	botEntry := chathistory.Entry{
 		ID:        sent.ID,
 		Time:      time.Now(),
-		Author:    "бот",
+		Author:    h.botAuthor,
 		Text:      result.Message,
 		ReplyToID: msg.ID,
 		FromBot:   true,
