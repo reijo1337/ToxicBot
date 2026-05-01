@@ -223,3 +223,15 @@ func TestGenerator_ReloadMessages_SystemPromptByteStable(t *testing.T) {
 		"\n</examples>"
 	assert.Equal(t, expected, g.systemPrompt)
 }
+
+func TestSystemPromptBase_DescribesNewMessageEnvelope(t *testing.T) {
+	t.Parallel()
+
+	assert.NotContains(t, systemPromptBase, `from="@name"`,
+		"system prompt must not describe the old `from=` envelope")
+
+	assert.Contains(t, systemPromptBase, `time="YYYY-MM-DDTHH:MM"`,
+		"system prompt must describe ISO date format")
+	assert.Contains(t, systemPromptBase, "Имя автора передаётся отдельно в поле name сообщения",
+		"system prompt must explicitly tell the model that author goes in the name field")
+}
