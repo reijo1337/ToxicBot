@@ -9,15 +9,15 @@ import (
 
 type config struct {
 	APIKey     string        `envconfig:"DEEPSEEK_API_KEY"     required:"true"`
-	BaseURL    string        `envconfig:"DEEPSEEK_BASE_URL"                    default:"https://api.deepseek.com"`
+	BaseURL    string        `envconfig:"DEEPSEEK_BASE_URL"                    default:"https://api.deepseek.com/v1"`
 	Timeout    time.Duration `envconfig:"DEEPSEEK_TIMEOUT"                     default:"30s"`
 	MaxRetries int           `envconfig:"DEEPSEEK_MAX_RETRIES"                 default:"3"`
 }
 
-func (c *Client) parseConfig() error {
-	if err := envconfig.Process("", &c.cfg); err != nil {
-		return fmt.Errorf("envconfig.Process error: %w", err)
+func parseConfig() (config, error) {
+	var c config
+	if err := envconfig.Process("", &c); err != nil {
+		return c, fmt.Errorf("envconfig.Process error: %w", err)
 	}
-
-	return nil
+	return c, nil
 }

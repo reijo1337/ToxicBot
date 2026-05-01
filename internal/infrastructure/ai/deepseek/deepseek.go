@@ -1,142 +1,97 @@
 package deepseek
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/reijo1337/ToxicBot/internal/features/message"
 )
 
-type Role string
-
-const (
-	RoleUser      Role = "user"
-	RoleSystem    Role = "system"
-	RoleAssistant Role = "assistant"
-)
-
+// Client is a thin DeepSeek wrapper on top of the official OpenAI Go SDK.
+// DeepSeek exposes an OpenAI-compatible Chat Completions endpoint, so we
+// reuse the SDK by pointing it at https://api.deepseek.com/v1.
 type Client struct {
-	httpClient *http.Client
-	cfg        config
+	sdk   openai.Client
+	model string
 }
 
-// ChatMessage представляет сообщение в чате
-type ChatMessage struct {
-	Role    Role   `json:"role"`
-	Content string `json:"content"`
-}
+const defaultModel = "deepseek-chat"
 
-// ChatRequest представляет запрос к API чата
-type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []ChatMessage `json:"messages"`
-}
-
-// ChatResponse представляет ответ от API чата
-type ChatResponse struct {
-	ID      string `json:"id"`
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
-
-// ErrorResponse представляет ошибку от API
-type ErrorResponse struct {
-	Error struct {
-		Message string `json:"message"`
-		Type    string `json:"type"`
-		Code    string `json:"code,omitempty"`
-	} `json:"error"`
-}
-
-// New создает новый клиент Deepseek
 func New() (*Client, error) {
-	client := &Client{}
-
-	if err := client.parseConfig(); err != nil {
+	cfg, err := parseConfig()
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	client.httpClient = &http.Client{
-		Timeout: client.cfg.Timeout,
-	}
-
-	return client, nil
+	sdk := openai.NewClient(
+		option.WithAPIKey(cfg.APIKey),
+		option.WithBaseURL(cfg.BaseURL),
+		option.WithRequestTimeout(cfg.Timeout),
+		option.WithMaxRetries(cfg.MaxRetries),
+	)
+	return &Client{sdk: sdk, model: defaultModel}, nil
 }
 
-// Chat отправляет запрос к API чата
-func (c *Client) Chat(ctx context.Context, msgs ...ChatMessage) (string, error) {
+// Chat sends the prepared message envelope to DeepSeek and returns the
+// assistant content of the first choice. LLMMessage.Name is mapped to the
+// OpenAI `messages[].name` field for user and assistant messages.
+func (c *Client) Chat(
+	ctx context.Context,
+	msgs ...message.LLMMessage,
+) (string, error) {
 	if len(msgs) == 0 {
 		return "", errors.New("no messages provided")
 	}
 
-	req := chatRequest{
-		Model:    "deepseek-chat",
-		Messages: msgs,
-	}
-
-	jsonData, err := json.Marshal(req)
+	resp, err := c.sdk.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model:    c.model,
+		Messages: toSDKMessages(msgs),
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", fmt.Errorf("deepseek chat: %w", err)
 	}
-
-	httpReq, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		c.cfg.BaseURL+"/v1/chat/completions",
-		bytes.NewBuffer(jsonData),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
-
-	var resp *http.Response
-	for i := 0; i <= c.cfg.MaxRetries; i++ {
-		resp, err = c.httpClient.Do(httpReq)
-		if err == nil && resp.StatusCode < 500 {
-			break
-		}
-
-		if i < c.cfg.MaxRetries {
-			time.Sleep(time.Duration(i+1) * time.Second)
-		}
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("failed to send request after retries: %w", err)
-	}
-	defer resp.Body.Close() //nolint
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal(body, &errorResp); err != nil {
-			return "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
-		}
-		return "", fmt.Errorf("API error: %s", errorResp.Error.Message)
-	}
-
-	var chatResp ChatResponse
-	if err := json.Unmarshal(body, &chatResp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
+	if len(resp.Choices) == 0 {
 		return "", errors.New("no choices in response")
 	}
+	return resp.Choices[0].Message.Content, nil
+}
 
-	return chatResp.Choices[0].Message.Content, nil
+func toSDKMessages(in []message.LLMMessage) []openai.ChatCompletionMessageParamUnion {
+	out := make([]openai.ChatCompletionMessageParamUnion, 0, len(in))
+	for _, m := range in {
+		switch m.Role {
+		case message.RoleSystem:
+			out = append(out, openai.ChatCompletionMessageParamUnion{
+				OfSystem: &openai.ChatCompletionSystemMessageParam{
+					Content: openai.ChatCompletionSystemMessageParamContentUnion{
+						OfString: openai.String(m.Content),
+					},
+				},
+			})
+		case message.RoleUser:
+			user := &openai.ChatCompletionUserMessageParam{
+				Content: openai.ChatCompletionUserMessageParamContentUnion{
+					OfString: openai.String(m.Content),
+				},
+			}
+			if m.Name != "" {
+				user.Name = openai.String(m.Name)
+			}
+			out = append(out, openai.ChatCompletionMessageParamUnion{OfUser: user})
+		case message.RoleAssistant:
+			ass := &openai.ChatCompletionAssistantMessageParam{
+				Content: openai.ChatCompletionAssistantMessageParamContentUnion{
+					OfString: openai.String(m.Content),
+				},
+			}
+			if m.Name != "" {
+				ass.Name = openai.String(m.Name)
+			}
+			out = append(out, openai.ChatCompletionMessageParamUnion{OfAssistant: ass})
+		}
+	}
+	return out
 }
