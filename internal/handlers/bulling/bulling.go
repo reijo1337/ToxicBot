@@ -31,6 +31,7 @@ type Handler struct {
 	r                *rand.Rand
 	msgCount         map[string]*list.List
 	cooldown         map[string]time.Time
+	botAuthor        string
 	muCount          sync.Mutex
 	muCooldown       sync.Mutex
 }
@@ -42,6 +43,7 @@ func New(
 	settingsProvider settingsProvider,
 	historyBuffer historyBuffer,
 	replier botReplier,
+	botAuthor string,
 ) (*Handler, error) {
 	return &Handler{
 		ctx:              ctx,
@@ -53,6 +55,7 @@ func New(
 		msgCount:         make(map[string]*list.List),
 		cooldown:         make(map[string]time.Time),
 		r:                rand.New(rand.NewSource(time.Now().UnixNano())),
+		botAuthor:        botAuthor,
 	}, nil
 }
 
@@ -143,7 +146,7 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 	botEntry := chathistory.Entry{
 		ID:        sent.ID,
 		Time:      time.Now(),
-		Author:    "бот",
+		Author:    b.botAuthor,
 		Text:      result.Message,
 		ReplyToID: msg.ID,
 		FromBot:   true,

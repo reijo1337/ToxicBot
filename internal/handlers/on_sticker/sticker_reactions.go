@@ -26,6 +26,7 @@ type StickerReactions struct {
 	settingsProvider     settingsProvider
 	history              historyBuffer
 	replier              botReplier
+	botAuthor            string
 	stickers             []string
 	stickersFromPacks    []string
 	muStk                sync.RWMutex
@@ -43,6 +44,7 @@ func New(
 	history historyBuffer,
 	replier botReplier,
 	updateStickersPeriod time.Duration,
+	botAuthor string,
 ) (*StickerReactions, error) {
 	out := StickerReactions{
 		ctx:                  ctx,
@@ -55,6 +57,7 @@ func New(
 		history:              history,
 		replier:              replier,
 		updateStickersPeriod: updateStickersPeriod,
+		botAuthor:            botAuthor,
 	}
 
 	if err := out.reloadStickers(); err != nil {
@@ -122,7 +125,7 @@ func (sr *StickerReactions) Handle(ctx telebot.Context) error {
 	sr.history.Add(chat.ID, chathistory.Entry{
 		ID:        sent.ID,
 		Time:      time.Now(),
-		Author:    "бот",
+		Author:    sr.botAuthor,
 		Text:      "*прислал стикер*",
 		ReplyToID: msg.ID,
 		FromBot:   true,

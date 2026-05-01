@@ -179,6 +179,8 @@ func main() {
 		)
 	}
 
+	botAuthor := "@" + b.Me.Username
+
 	igorHandler, err := personal.New(
 		ctx,
 		"igor",
@@ -228,6 +230,7 @@ func main() {
 		settingsProvider,
 		chatHistory,
 		b,
+		botAuthor,
 	)
 	if err != nil {
 		logger.Fatal(
@@ -273,6 +276,7 @@ func main() {
 		chatHistory,
 		b,
 		cfg.UpdateStickersPeriod,
+		botAuthor,
 	)
 	if err != nil {
 		logger.Fatal(
@@ -292,6 +296,7 @@ func main() {
 		b,
 		cfg.UpdateVoicesPeriod,
 		b,
+		botAuthor,
 	)
 	if err != nil {
 		logger.Fatal(
@@ -300,7 +305,6 @@ func main() {
 		)
 	}
 
-	botAuthorTemp := "@" + b.Me.Username
 	onPhoto := on_photo.New(
 		ctx,
 		gigachatClient,
@@ -313,7 +317,7 @@ func main() {
 		logger,
 		statsIncer,
 		b.Me.ID,
-		botAuthorTemp,
+		botAuthor,
 	)
 
 	taggerHandler, err := tagger.New(

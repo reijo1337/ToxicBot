@@ -27,6 +27,7 @@ type Handler struct {
 	settingsProvider settingsProvider
 	history          historyBuffer
 	replier          botReplier
+	botAuthor        string
 	voices           []string
 	muVcs            sync.RWMutex
 	updatePeriod     time.Duration
@@ -43,6 +44,7 @@ func New(
 	replier botReplier,
 	updatePeriod time.Duration,
 	downloader downloader,
+	botAuthor string,
 ) (*Handler, error) {
 	out := Handler{
 		ctx:              ctx,
@@ -55,6 +57,7 @@ func New(
 		replier:          replier,
 		updatePeriod:     updatePeriod,
 		downloader:       downloader,
+		botAuthor:        botAuthor,
 	}
 
 	if err := out.reloadVoices(); err != nil {
@@ -141,7 +144,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	h.history.Add(chat.ID, chathistory.Entry{
 		ID:        sent.ID,
 		Time:      time.Now(),
-		Author:    "бот",
+		Author:    h.botAuthor,
 		Text:      "*прислал голосовое*",
 		ReplyToID: msg.ID,
 		FromBot:   true,
