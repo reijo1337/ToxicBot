@@ -76,48 +76,49 @@ func SanitizeAuthor(username, firstName string, userID int64, isBot bool) string
 	return cleaned
 }
 
-// StripOutputMsgEnvelope removes a single outer `<msg ...>...</msg>` wrapper
-// if the model echoes one back. It only strips a balanced outer pair; nested
-// or asymmetric tags are left alone (anti-injection: don't accidentally
-// unwrap user-quoted content).
+// StripOutputMsgEnvelope removes a `<msg ...>...</msg>` wrapper that the model
+// echoes back at the start of its reply. It strips:
+//   - the leading envelope when the trimmed string starts with `<msg`;
+//   - any trailing chatter the model appends after the closing `</msg>`.
+//
+// It refuses to touch the string when the envelope is nested (another `<msg`
+// inside the inner body) or when the leading text is not `<msg` at all
+// (anti-injection: don't accidentally unwrap user-quoted content sitting in
+// the middle of a sentence).
 func StripOutputMsgEnvelope(s string) string {
 	trimmed := strings.TrimSpace(s)
-	if trimmed == "" {
-		return s
-	}
-
-	const closingTag = "</msg>"
-	if !strings.HasSuffix(trimmed, closingTag) {
+	if !strings.HasPrefix(trimmed, "<msg") {
 		return s
 	}
 
 	// The opening must look like `<msg` followed by either `>` or whitespace.
-	if !strings.HasPrefix(trimmed, "<msg") {
+	// `HasPrefix` only guarantees len >= 4, so the equality case (`<msg`
+	// alone, no attributes, no closing) must be filtered out before indexing.
+	if len(trimmed) <= len("<msg") {
 		return s
 	}
-	if len(trimmed) < len("<msg") {
-		return s
-	}
-	next := trimmed[len("<msg")]
-	if next != '>' && next != ' ' && next != '\t' {
-		return s
-	}
-
-	// Reject nested or repeated wrappers — there must be exactly one opening
-	// `<msg` and one closing `</msg>` in the whole string.
-	if strings.Count(trimmed, "<msg") != 1 {
-		return s
-	}
-	if strings.Count(trimmed, closingTag) != 1 {
+	switch trimmed[len("<msg")] {
+	case '>', ' ', '\t':
+	default:
 		return s
 	}
 
-	openEnd := strings.IndexByte(trimmed, '>')
-	if openEnd < 0 {
+	_, body, ok := strings.Cut(trimmed, ">")
+	if !ok {
 		return s
 	}
 
-	inner := trimmed[openEnd+1 : len(trimmed)-len(closingTag)]
+	inner, _, ok := strings.Cut(body, "</msg>")
+	if !ok {
+		return s
+	}
+
+	// Refuse to strip a nested wrapper — the inner body must not contain
+	// another `<msg` token.
+	if strings.Contains(inner, "<msg") {
+		return s
+	}
+
 	return strings.TrimSpace(inner)
 }
 

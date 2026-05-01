@@ -8,6 +8,7 @@ import (
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
+	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"gopkg.in/telebot.v3"
@@ -78,7 +79,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	sender := pointer.From(ctx.Sender())
 	msg := ctx.Message()
 
-	author := formatAuthor(sender)
+	author := message.SanitizeAuthor(sender.Username, sender.FirstName, sender.ID, sender.IsBot)
 	replyToID := 0
 	if msg.ReplyTo != nil {
 		replyToID = msg.ReplyTo.ID
@@ -151,11 +152,4 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	})
 
 	return nil
-}
-
-func formatAuthor(user telebot.User) string {
-	if user.Username != "" {
-		return "@" + user.Username
-	}
-	return user.FirstName
 }

@@ -35,9 +35,19 @@ func TestStripOutputMsgEnvelope(t *testing.T) {
 			expected: "X",
 		},
 		{
-			name:     "envelope with bare tail not stripped",
+			name:     "trailing chatter after closing tag is stripped",
 			in:       "<msg>A</msg> bare tail",
-			expected: "<msg>A</msg> bare tail",
+			expected: "A",
+		},
+		{
+			name:     "trailing chatter with attributes is stripped",
+			in:       `<msg time="2026-05-01T21:24">плохой</msg>  и ещё немного`,
+			expected: "плохой",
+		},
+		{
+			name:     "lone opening tag without body is left alone",
+			in:       "<msg",
+			expected: "<msg",
 		},
 		{
 			name:     "head before envelope not stripped",

@@ -23,7 +23,8 @@ const (
 func formatUserContent(e chathistory.Entry, history []chathistory.Entry) string {
 	var b strings.Builder
 	b.WriteString(`<msg time="`)
-	b.WriteString(e.Time.Format(timeLayoutLLM))
+	// timestamp is always emitted in UTC so the prompt is host-TZ-independent.
+	b.WriteString(e.Time.UTC().Format(timeLayoutLLM))
 	b.WriteString(`"`)
 
 	if e.ReplyToID != 0 {

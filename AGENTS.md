@@ -102,7 +102,7 @@ Live в `internal/features/message/`. Две стратегии:
 LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaChat). Клиент DeepSeek построен на официальном SDK `github.com/openai/openai-go/v3` через переопределённый `BaseURL`. У генератора два метода:
 
 - `GetMessageText(replyTo, aiChance)` — одиночная реплика без контекста.
-- `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory, размер 50 сообщений; см. `cmd/main.go:117`).
+- `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory, размер 100 сообщений; см. `cmd/main.go:118`).
 
 Ответ LLM прогоняется через `sanitize.go` (фильтрация артефактов) и `phrase_filter` (проверка на осмысленность).
 
