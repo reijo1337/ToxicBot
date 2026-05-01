@@ -70,8 +70,10 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	assert.Equal(t, RoleSystem, captured[0].Role)
 	assert.Equal(t, RoleUser, captured[1].Role)
 	assert.Equal(t, RoleAssistant, captured[2].Role)
+	assert.Equal(t, "бот", captured[2].Name)
 	assert.Equal(t, RoleUser, captured[3].Role)
-	assert.Equal(t, `<msg time="14:00" from="@alice" reply_to="бот">йо</msg>`, captured[3].Content)
+	assert.Equal(t, "@alice", captured[3].Name)
+	assert.Equal(t, `<msg time="2026-04-24T14:00" reply_to="бот">йо</msg>`, captured[3].Content)
 }
 
 func TestGenerator_WithHistory_FallbackOnAiChanceMiss(t *testing.T) {
