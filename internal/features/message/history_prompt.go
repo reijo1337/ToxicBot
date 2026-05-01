@@ -12,10 +12,9 @@ const (
 )
 
 // formatUserContent renders one history entry as `<msg time="..." [reply_to="@..."]>текст</msg>`.
-// The `from=` attribute used to live here too; authorship now travels in
-// LLMMessage.Name. The body is sanitized to defang any nested tag forging or
-// control characters unless the caller marked the entry as PreFormatted
-// (already-XML-formatted bodies produced by the photo handler).
+// Authorship travels in LLMMessage.Name. The body is sanitized to defang any
+// nested tag forging or control characters unless the caller marked the entry
+// as PreFormatted (already-XML-formatted bodies produced by the photo handler).
 func formatUserContent(e chathistory.Entry, history []chathistory.Entry) string {
 	var b strings.Builder
 	b.WriteString(`<msg time="`)
