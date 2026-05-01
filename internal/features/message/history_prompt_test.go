@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
-	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -142,12 +141,12 @@ func TestBuildChatCompletions_AssemblyOrderAndSystem(t *testing.T) {
 	msgs := buildChatCompletions(system, history)
 
 	require.Len(t, msgs, 3)
-	assert.Equal(t, deepseek.RoleSystem, msgs[0].Role)
+	assert.Equal(t, RoleSystem, msgs[0].Role)
 	assert.Equal(t, "SYS", msgs[0].Content)
 	assert.NotContains(t, msgs[0].Content, "история чата")
-	assert.Equal(t, deepseek.RoleUser, msgs[1].Role)
+	assert.Equal(t, RoleUser, msgs[1].Role)
 	assert.Equal(t, `<msg time="14:00" from="@alice">привет</msg>`, msgs[1].Content)
-	assert.Equal(t, deepseek.RoleUser, msgs[2].Role)
+	assert.Equal(t, RoleUser, msgs[2].Role)
 	assert.Equal(t, `<msg time="14:01" from="@alice">ответь</msg>`, msgs[2].Content)
 }
 
@@ -173,7 +172,7 @@ func TestBuildChatCompletions_BotEntrySanitizedToAssistant(t *testing.T) {
 	msgs := buildChatCompletions("SYS", history)
 
 	require.Len(t, msgs, 3)
-	assert.Equal(t, deepseek.RoleAssistant, msgs[2].Role)
+	assert.Equal(t, RoleAssistant, msgs[2].Role)
 	assert.Equal(t, `‹msg from="@bot"›x‹/msg›`, msgs[2].Content)
 }
 
@@ -207,9 +206,9 @@ func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 	msgs := buildChatCompletions("SYS", history)
 
 	require.Len(t, msgs, 4)
-	assert.Equal(t, deepseek.RoleUser, msgs[1].Role)
-	assert.Equal(t, deepseek.RoleAssistant, msgs[2].Role)
-	assert.Equal(t, deepseek.RoleUser, msgs[3].Role)
+	assert.Equal(t, RoleUser, msgs[1].Role)
+	assert.Equal(t, RoleAssistant, msgs[2].Role)
+	assert.Equal(t, RoleUser, msgs[3].Role)
 	assert.Equal(
 		t,
 		`<msg time="14:00" from="@alice" reply_to="бот">сам такой</msg>`,
@@ -232,7 +231,7 @@ func TestBuildChatCompletions_SingleUser(t *testing.T) {
 	msgs := buildChatCompletions("SYS", history)
 
 	require.Len(t, msgs, 2)
-	assert.Equal(t, deepseek.RoleSystem, msgs[0].Role)
-	assert.Equal(t, deepseek.RoleUser, msgs[1].Role)
+	assert.Equal(t, RoleSystem, msgs[0].Role)
+	assert.Equal(t, RoleUser, msgs[1].Role)
 	assert.Equal(t, `<msg time="14:00" from="@alice">привет</msg>`, msgs[1].Content)
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
-	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -24,10 +23,10 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	rnd.EXPECT().Float32().Return(float32(0.0))
 	filter.EXPECT().IsMeaningfulPhrase("йо").Return(true)
 
-	var captured []deepseek.ChatMessage
+	var captured []LLMMessage
 	aiMock.EXPECT().
 		Chat(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, msgs ...deepseek.ChatMessage) (string, error) {
+		DoAndReturn(func(_ context.Context, msgs ...LLMMessage) (string, error) {
 			captured = msgs
 			return "ответ", nil
 		})
@@ -68,10 +67,10 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "ответ", res.Message)
 	require.Len(t, captured, 4)
-	assert.Equal(t, deepseek.RoleSystem, captured[0].Role)
-	assert.Equal(t, deepseek.RoleUser, captured[1].Role)
-	assert.Equal(t, deepseek.RoleAssistant, captured[2].Role)
-	assert.Equal(t, deepseek.RoleUser, captured[3].Role)
+	assert.Equal(t, RoleSystem, captured[0].Role)
+	assert.Equal(t, RoleUser, captured[1].Role)
+	assert.Equal(t, RoleAssistant, captured[2].Role)
+	assert.Equal(t, RoleUser, captured[3].Role)
 	assert.Equal(t, `<msg time="14:00" from="@alice" reply_to="бот">йо</msg>`, captured[3].Content)
 }
 

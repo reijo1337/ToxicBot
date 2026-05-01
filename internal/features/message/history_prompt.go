@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
-	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 )
 
 const maxEntryRunes = 500
@@ -54,7 +53,7 @@ func sanitizeAttr(s string) string {
 	return strings.ReplaceAll(s, `"`, "")
 }
 
-// buildChatCompletions assembles messages for DeepSeek: one system prompt
+// buildChatCompletions assembles messages for the LLM: one system prompt
 // followed by each entry from history in chronological order. Bot entries
 // become role=assistant; user entries become role=user wrapped in an
 // <msg>...</msg> tag. The trigger message is expected to already be the last
@@ -62,23 +61,23 @@ func sanitizeAttr(s string) string {
 func buildChatCompletions(
 	system string,
 	history []chathistory.Entry,
-) []deepseek.ChatMessage {
-	msgs := make([]deepseek.ChatMessage, 0, len(history)+1)
-	msgs = append(msgs, deepseek.ChatMessage{
-		Role:    deepseek.RoleSystem,
+) []LLMMessage {
+	msgs := make([]LLMMessage, 0, len(history)+1)
+	msgs = append(msgs, LLMMessage{
+		Role:    RoleSystem,
 		Content: system,
 	})
 
 	for _, e := range history {
 		if e.FromBot {
-			msgs = append(msgs, deepseek.ChatMessage{
-				Role:    deepseek.RoleAssistant,
+			msgs = append(msgs, LLMMessage{
+				Role:    RoleAssistant,
 				Content: SanitizeText(e.Text, maxEntryRunes),
 			})
 			continue
 		}
-		msgs = append(msgs, deepseek.ChatMessage{
-			Role:    deepseek.RoleUser,
+		msgs = append(msgs, LLMMessage{
+			Role:    RoleUser,
 			Content: formatUserContent(e, history),
 		})
 	}

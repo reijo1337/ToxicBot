@@ -13,7 +13,6 @@ import (
 	context "context"
 	reflect "reflect"
 
-	deepseek "github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -221,7 +220,7 @@ func (m *Mockai) EXPECT() *MockaiMockRecorder {
 }
 
 // Chat mocks base method.
-func (m *Mockai) Chat(ctx context.Context, msgs ...deepseek.ChatMessage) (string, error) {
+func (m *Mockai) Chat(ctx context.Context, msgs ...LLMMessage) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx}
 	for _, a := range msgs {

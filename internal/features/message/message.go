@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
-	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 )
 
 type GenerationStrategy uint8
@@ -237,12 +236,12 @@ func (g *Generator) generateAi(replyTo string, aiChance float32) (string, error)
 
 	return g.ai.Chat(
 		context.Background(),
-		deepseek.ChatMessage{
-			Role:    deepseek.RoleSystem,
+		LLMMessage{
+			Role:    RoleSystem,
 			Content: g.systemPrompt,
 		},
-		deepseek.ChatMessage{
-			Role:    deepseek.RoleUser,
+		LLMMessage{
+			Role:    RoleUser,
 			Content: replyTo,
 		},
 	)
