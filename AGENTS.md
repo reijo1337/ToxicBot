@@ -42,7 +42,6 @@ internal/
   infrastructure/
     ai/deepseek/                         — DeepSeek LLM client
     ai/gigachat/                         — GigaChat LLM client
-    ai/openai/                           — OpenAI LLM client
     sheets/google_spreadsheet/           — Google Sheets data source
     storage/db/                          — storage layer (SQLite)
   usecase/                               — business logic
@@ -100,7 +99,7 @@ Live в `internal/features/message/`. Две стратегии:
 1. **List-Based** — random message from Google Sheets.
 2. **AI** — system prompt с токсичными оскорблениями (1–2 предложения). Контролируется per-chat `ai_chance`. При ошибке LLM — fallback на list-based.
 
-LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaChat; OpenAI присутствует как third-party клиент в `internal/infrastructure/ai/openai/`). У генератора два метода:
+LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaChat). Клиент DeepSeek построен на официальном SDK `github.com/openai/openai-go/v3` через переопределённый `BaseURL`. У генератора два метода:
 
 - `GetMessageText(replyTo, aiChance)` — одиночная реплика без контекста.
 - `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory, размер 50 сообщений; см. `cmd/main.go:117`).
@@ -119,7 +118,6 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `SQLITE_FILE_PATH` | `internal/config/config.go` | Path to SQLite database file |
 | `DEEPSEEK_API_KEY` | `internal/infrastructure/ai/deepseek/config.go` | DeepSeek API key |
 | `GIGACHAT_AUTH_KEY` | `internal/infrastructure/ai/gigachat/config.go` | GigaChat API key |
-| `OPENAI_API_KEY` | `internal/infrastructure/ai/openai/config.go` | OpenAI API key |
 | `GOOGLE_CREDENTIALS` | `internal/infrastructure/sheets/google_spreadsheet/config.go` | JSON with Google API credentials |
 | `GOOGLE_SPREADSHEET_ID` | `internal/infrastructure/sheets/google_spreadsheet/config.go` | Google Sheets spreadsheet ID |
 | `IGOR_ID` / `MAX_ID` / `KIRILL_ID` | `internal/handlers/personal/personal.go` (`os.Getenv`) | Telegram user IDs для personal-хендлеров |
@@ -161,7 +159,6 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `GIGACHAT_SCOPE` | `GIGACHAT_API_PERS` | GigaChat OAuth scope |
 | `GIGACHAT_MODEL` | `GigaChat-Pro` | GigaChat model name |
 | `GIGACHAT_TIMEOUT` | 60s | GigaChat request timeout |
-| `OPENAI_TIMEOUT` | 30s | OpenAI request timeout |
 
 ## Per-Chat Settings
 
