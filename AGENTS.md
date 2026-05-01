@@ -153,7 +153,7 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 
 | Variable | Default | Description |
 |---|---|---|
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek endpoint override |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint override (SDK appends `/chat/completions`) |
 | `DEEPSEEK_TIMEOUT` | 30s | DeepSeek request timeout |
 | `DEEPSEEK_MAX_RETRIES` | 3 | DeepSeek retry budget |
 | `GIGACHAT_SCOPE` | `GIGACHAT_API_PERS` | GigaChat OAuth scope |
