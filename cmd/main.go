@@ -85,6 +85,7 @@ func main() {
 	connGetter := db.NewConnGetter(dbpool)
 	responseLogStorage := db.NewResponseLogStorage(connGetter)
 	chatSettingsStorage := db.NewChatSettingsStorage(connGetter)
+	chatHistoryStorage := db.NewChatHistoryStorage(connGetter)
 
 	gs, err := google_spreadsheet.New(ctx)
 	if err != nil {
@@ -114,7 +115,11 @@ func main() {
 		)
 	}
 
-	chatHistory := chathistory.NewBuffer(50)
+	chatHistory := chathistory.NewBuffer(
+		50,
+		chathistory.WithStore(chatHistoryStorage),
+		chathistory.WithLogger(logger),
+	)
 
 	statsIncer, err := stats.New(AesKeyString, responseLogStorage, logger)
 	if err != nil {
