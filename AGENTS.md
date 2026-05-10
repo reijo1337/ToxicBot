@@ -156,6 +156,8 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint override (SDK appends `/chat/completions`) |
 | `DEEPSEEK_TIMEOUT` | 30s | DeepSeek request timeout |
 | `DEEPSEEK_MAX_RETRIES` | 3 | DeepSeek retry budget |
+| `DEEPSEEK_MAX_TOKENS` | 220 | Hard cap на длину ответа в токенах (~270-330 рус. символов; перекрывает лимит 300 рун, который применяет постпроцессинг) |
+| `DEEPSEEK_TEMPERATURE` | 1.1 | Sampling temperature (0-2). Между DeepSeek-дефолтом 1.0 и рекомендацией 1.3 для general chat — чуть собраннее, чтобы модель следовала правилу длины |
 | `GIGACHAT_SCOPE` | `GIGACHAT_API_PERS` | GigaChat OAuth scope |
 | `GIGACHAT_MODEL` | `GigaChat-Pro` | GigaChat model name |
 | `GIGACHAT_TIMEOUT` | 60s | GigaChat request timeout |

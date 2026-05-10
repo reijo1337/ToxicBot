@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/stretchr/testify/assert"
@@ -256,8 +257,8 @@ func TestGenerator_ReloadMessages_LongPhraseTruncated(t *testing.T) {
 	g := &Generator{storage: storage}
 	require.NoError(t, g.reloadMessages())
 
-	assert.Contains(t, g.systemPrompt, "<example>"+strings.Repeat("я", 500)+"</example>")
-	assert.NotContains(t, g.systemPrompt, "<example>"+strings.Repeat("я", 501))
+	assert.Contains(t, g.systemPrompt, "<example>"+strings.Repeat("я", 150)+"</example>")
+	assert.NotContains(t, g.systemPrompt, "<example>"+strings.Repeat("я", 151))
 }
 
 func TestGenerator_ReloadMessages_SystemPromptByteStable(t *testing.T) {
@@ -293,4 +294,65 @@ func TestSystemPromptBase_DescribesNewMessageEnvelope(t *testing.T) {
 		"system prompt must explicitly tell the model that author goes in the name field")
 	assert.Contains(t, systemPromptBase, "Твой ответ — это просто текст реплики, без обёртки <msg>",
 		"system prompt must explicitly forbid <msg> wrapping in the reply")
+}
+
+func TestGenerator_ReloadMessages_PromptHasLengthRuleAndShortExamples(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	repo := NewMockmessageRepository(ctrl)
+
+	long := strings.Repeat("я", 400) // 400 рун — заведомо больше 150
+	repo.EXPECT().GetEnabledRandom().Return([]string{long, "коротко"}, nil)
+
+	g := &Generator{storage: repo}
+	require.NoError(t, g.reloadMessages())
+
+	assert.Contains(t, g.systemPrompt, "ЖЁСТКОЕ ПРАВИЛО ДЛИНЫ",
+		"system prompt must contain the hard length rule keyword")
+
+	// Каждый <example>...</example> блок не должен превышать 150 рун содержимого.
+	const wantMax = 150
+	exStart := "<example>"
+	exEnd := "</example>"
+	rest := g.systemPrompt
+	for {
+		i := strings.Index(rest, exStart)
+		if i < 0 {
+			break
+		}
+		j := strings.Index(rest[i:], exEnd)
+		require.GreaterOrEqual(t, j, 0, "unterminated <example>")
+		body := rest[i+len(exStart) : i+j]
+		assert.LessOrEqual(t, utf8.RuneCountInString(body), wantMax,
+			"example body must be <= %d runes, got: %q", wantMax, body)
+		rest = rest[i+j+len(exEnd):]
+	}
+}
+
+func TestGenerator_GetMessageText_TrimsToThreeSentencesMax(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	aiMock := NewMockai(ctrl)
+	rnd := NewMockrandomizer(ctrl)
+	filter := NewMockmeaningfullFilter(ctrl)
+
+	rnd.EXPECT().Float32().Return(float32(0.0))
+	filter.EXPECT().IsMeaningfulPhrase("привет").Return(true)
+	aiMock.EXPECT().
+		Chat(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return("Один. Два. Три. Четыре. Пять.", nil)
+
+	g := &Generator{
+		r:                 rnd,
+		ai:                aiMock,
+		meaningfullFilter: filter,
+		systemPrompt:      "SYS",
+	}
+
+	res := g.GetMessageText("привет", 1.0)
+
+	assert.Equal(t, AiGenerationStrategy, res.Strategy)
+	assert.Equal(t, "Один. Два. Три.", res.Message)
 }

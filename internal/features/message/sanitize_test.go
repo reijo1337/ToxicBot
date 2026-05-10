@@ -155,3 +155,155 @@ func TestSanitizeAuthor(t *testing.T) {
 		})
 	}
 }
+
+func TestStripOutputMsgEnvelope_TruncatedByAPI(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		in       string
+		expected string
+	}{
+		{
+			name:     "no closing msg tag, body returned without opening tag",
+			in:       `<msg time="2026-05-01T21:24" reply_to="@u">недописанный ответ`,
+			expected: "недописанный ответ",
+		},
+		{
+			name:     "no closing tag, body has trailing whitespace",
+			in:       `<msg time="2026-05-01T21:24">текст ответа   `,
+			expected: "текст ответа",
+		},
+		{
+			name:     "no closing tag, body contains nested msg — refuse to strip",
+			in:       `<msg time="2026-05-01T21:24">а вот <msg time="...">пример`,
+			expected: `<msg time="2026-05-01T21:24">а вот <msg time="...">пример`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, StripOutputMsgEnvelope(tc.in))
+		})
+	}
+}
+
+func TestTrimToSentences(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		in           string
+		maxSentences int
+		maxRunes     int
+		expected     string
+	}{
+		{
+			name:         "single short sentence passes through",
+			in:           "Короткая фраза.",
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     "Короткая фраза.",
+		},
+		{
+			name:         "cut to three out of four sentences",
+			in:           "Один. Два. Три. Четыре.",
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     "Один. Два. Три.",
+		},
+		{
+			name:         "mixed terminators dot bang question and ellipsis",
+			in:           "Один! Два? Три... Четыре.",
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     "Один! Два? Три...",
+		},
+		{
+			name:         "fallback rune-truncate when no terminators",
+			in:           strings.Repeat("а", 500),
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     strings.Repeat("а", 300),
+		},
+		{
+			name:         "short string without terminator passes through unchanged",
+			in:           "hello",
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     "hello",
+		},
+		{
+			name:         "emoji rune counted correctly before terminator",
+			in:           "Ха😈. Ну.",
+			maxSentences: 1,
+			maxRunes:     300,
+			expected:     "Ха😈.",
+		},
+		{
+			name:         "exactly three short sentences passes through",
+			in:           "А! Б? В.",
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     "А! Б? В.",
+		},
+		{
+			name:         "single-char ellipsis is a terminator",
+			in:           "Один… Два… Три… Четыре.",
+			maxSentences: 2,
+			maxRunes:     300,
+			expected:     "Один… Два…",
+		},
+		{
+			name:         "empty string stays empty",
+			in:           "",
+			maxSentences: 3,
+			maxRunes:     300,
+			expected:     "",
+		},
+		{
+			name:         "rune budget cuts before sentence budget",
+			in:           "Один. Два. Этотрелтретьеоченьдлинноепредложение которое неместится. Четыре.",
+			maxSentences: 4,
+			maxRunes:     12,
+			expected:     "Один. Два.",
+		},
+		{
+			name:         "consecutive bang and question count as one boundary",
+			in:           "Что?! Серьёзно?! Ну ок.",
+			maxSentences: 2,
+			maxRunes:     300,
+			expected:     "Что?! Серьёзно?!",
+		},
+		{
+			name:         "max sentences zero returns empty",
+			in:           "Один. Два.",
+			maxSentences: 0,
+			maxRunes:     300,
+			expected:     "",
+		},
+		{
+			name:         "max runes zero returns empty",
+			in:           "Один.",
+			maxSentences: 3,
+			maxRunes:     0,
+			expected:     "",
+		},
+		{
+			name:         "fallback truncate stops on rune boundary with emojis",
+			in:           "ха😈ха😈ха😈ха😈ха😈ха😈ха😈",
+			maxSentences: 3,
+			maxRunes:     5,
+			expected:     "ха😈ха",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := TrimToSentences(tc.in, tc.maxSentences, tc.maxRunes)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
+}

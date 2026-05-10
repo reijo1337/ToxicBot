@@ -108,18 +108,19 @@ func StripOutputMsgEnvelope(s string) string {
 		return s
 	}
 
-	inner, _, ok := strings.Cut(body, "</msg>")
-	if !ok {
-		return s
+	// `</msg>` is missing when the API truncated the reply by max_tokens — in
+	// that case we still drop the dangling opener and return the body as-is.
+	inner, _, hasClose := strings.Cut(body, "</msg>")
+	target := body
+	if hasClose {
+		target = inner
 	}
 
-	// Refuse to strip a nested wrapper — the inner body must not contain
-	// another `<msg` token.
-	if strings.Contains(inner, "<msg") {
+	// Anti-injection: refuse to unwrap if a nested `<msg` token sits inside.
+	if strings.Contains(target, "<msg") {
 		return s
 	}
-
-	return strings.TrimSpace(inner)
+	return strings.TrimSpace(target)
 }
 
 func isStripped(r rune) bool {
@@ -156,6 +157,75 @@ func collapseSpaces(s string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+// TrimToSentences caps the model's output by two budgets at once:
+// (1) at most maxSentences sentences, (2) at most maxRunes runes. A sentence
+// boundary is a terminator from {. ! ? …}; consecutive terminators (!!!,
+// ?!, !?) collapse into a single boundary. If the first maxSentences
+// sentences together exceed maxRunes — we cut at the last sentence
+// boundary that still fits the rune budget. If no boundary fits at all,
+// the fallback is truncateRunes (no ellipsis added — we don't want to
+// disguise a hard cut).
+func TrimToSentences(s string, maxSentences int, maxRunes int) string {
+	if maxSentences <= 0 || maxRunes <= 0 || s == "" {
+		return ""
+	}
+
+	type boundary struct {
+		byteEnd int // exclusive byte offset right after terminator run
+		runes   int // total rune count up to byteEnd
+	}
+
+	var boundaries []boundary
+
+	runeIdx := 0
+	inTerminator := false
+	for i, r := range s {
+		runeIdx++
+		if isSentenceTerminator(r) {
+			inTerminator = true
+			continue
+		}
+		if inTerminator {
+			// previous run of terminators ended at byte index i (current rune start)
+			boundaries = append(boundaries, boundary{
+				byteEnd: i,
+				runes:   runeIdx - 1,
+			})
+			inTerminator = false
+		}
+	}
+	if inTerminator {
+		// terminator run reaches end of string
+		boundaries = append(boundaries, boundary{
+			byteEnd: len(s),
+			runes:   runeIdx,
+		})
+	}
+
+	chosen := -1
+	for i := 0; i < len(boundaries) && i < maxSentences; i++ {
+		if boundaries[i].runes <= maxRunes {
+			chosen = i
+			continue
+		}
+		break
+	}
+
+	if chosen >= 0 {
+		return s[:boundaries[chosen].byteEnd]
+	}
+
+	return truncateRunes(s, maxRunes)
+}
+
+func isSentenceTerminator(r rune) bool {
+	switch r {
+	case '.', '!', '?', '…':
+		return true
+	}
+	return false
 }
 
 func truncateRunes(s string, maxRunes int) string {

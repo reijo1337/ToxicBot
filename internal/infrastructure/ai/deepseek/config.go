@@ -8,10 +8,12 @@ import (
 )
 
 type config struct {
-	APIKey     string        `envconfig:"DEEPSEEK_API_KEY"     required:"true"`
-	BaseURL    string        `envconfig:"DEEPSEEK_BASE_URL"                    default:"https://api.deepseek.com/v1"`
-	Timeout    time.Duration `envconfig:"DEEPSEEK_TIMEOUT"                     default:"30s"`
-	MaxRetries int           `envconfig:"DEEPSEEK_MAX_RETRIES"                 default:"3"`
+	APIKey      string        `envconfig:"DEEPSEEK_API_KEY"     required:"true"`
+	BaseURL     string        `envconfig:"DEEPSEEK_BASE_URL"                    default:"https://api.deepseek.com/v1"`
+	Timeout     time.Duration `envconfig:"DEEPSEEK_TIMEOUT"                     default:"30s"`
+	MaxRetries  int           `envconfig:"DEEPSEEK_MAX_RETRIES"                 default:"3"`
+	MaxTokens   int64         `envconfig:"DEEPSEEK_MAX_TOKENS"                  default:"220"`
+	Temperature float64       `envconfig:"DEEPSEEK_TEMPERATURE"                 default:"1.1"`
 }
 
 func parseConfig() (config, error) {
