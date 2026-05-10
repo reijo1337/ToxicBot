@@ -14,8 +14,10 @@ import (
 // DeepSeek exposes an OpenAI-compatible Chat Completions endpoint, so we
 // reuse the SDK by pointing it at https://api.deepseek.com/v1.
 type Client struct {
-	sdk   openai.Client
-	model string
+	sdk         openai.Client
+	model       string
+	maxTokens   int64
+	temperature float64
 }
 
 const defaultModel = "deepseek-v4-flash"
@@ -32,7 +34,12 @@ func New() (*Client, error) {
 		option.WithRequestTimeout(cfg.Timeout),
 		option.WithMaxRetries(cfg.MaxRetries),
 	)
-	return &Client{sdk: sdk, model: defaultModel}, nil
+	return &Client{
+		sdk:         sdk,
+		model:       defaultModel,
+		maxTokens:   cfg.MaxTokens,
+		temperature: cfg.Temperature,
+	}, nil
 }
 
 // Chat sends the prepared message envelope to DeepSeek and returns the
@@ -47,8 +54,10 @@ func (c *Client) Chat(
 	}
 
 	resp, err := c.sdk.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:    c.model,
-		Messages: toSDKMessages(msgs),
+		Model:       c.model,
+		Messages:    toSDKMessages(msgs),
+		MaxTokens:   openai.Int(c.maxTokens),
+		Temperature: openai.Float(c.temperature),
 	})
 	if err != nil {
 		return "", fmt.Errorf("deepseek chat: %w", err)

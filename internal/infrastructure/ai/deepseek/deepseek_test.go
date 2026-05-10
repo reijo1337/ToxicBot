@@ -19,8 +19,10 @@ import (
 // reqBody mirrors the on-the-wire JSON. Only the fields we assert on are
 // declared; unknown fields are dropped by the decoder.
 type reqBody struct {
-	Model    string       `json:"model"`
-	Messages []reqMessage `json:"messages"`
+	Model       string       `json:"model"`
+	Messages    []reqMessage `json:"messages"`
+	MaxTokens   int64        `json:"max_tokens"`
+	Temperature float64      `json:"temperature"`
 }
 
 type reqMessage struct {
@@ -37,7 +39,7 @@ func newClientForTest(t *testing.T, srv *httptest.Server) *Client {
 		option.WithMaxRetries(0),
 		option.WithRequestTimeout(2*time.Second),
 	)
-	return &Client{sdk: sdk, model: "deepseek-chat"}
+	return &Client{sdk: sdk, model: "deepseek-chat", maxTokens: 150, temperature: 1.1}
 }
 
 func TestChat_PutsNameOnUserAndAssistant_ButNotSystem(t *testing.T) {
@@ -124,4 +126,33 @@ func TestChat_WrapsHTTPErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "deepseek chat",
 		"errors must be wrapped with a context-friendly prefix")
+}
+
+func TestChat_SendsMaxTokensAndTemperature(t *testing.T) {
+	t.Parallel()
+
+	var got reqBody
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if !assert.NoError(t, err) {
+			return
+		}
+		if !assert.NoError(t, json.Unmarshal(raw, &got)) {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+
+	c := newClientForTest(t, srv)
+	_, err := c.Chat(
+		context.Background(),
+		message.LLMMessage{Role: message.RoleSystem, Content: "S"},
+		message.LLMMessage{Role: message.RoleUser, Content: "U"},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(150), got.MaxTokens, "max_tokens must reach the API")
+	assert.InDelta(t, 1.1, got.Temperature, 0.0001, "temperature must reach the API")
 }
