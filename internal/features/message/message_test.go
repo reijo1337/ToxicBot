@@ -2,6 +2,7 @@ package message
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -310,6 +311,12 @@ func TestGenerator_ReloadMessages_PromptHasLengthRuleAndShortExamples(t *testing
 
 	assert.Contains(t, g.systemPrompt, "ЖЁСТКОЕ ПРАВИЛО ДЛИНЫ",
 		"system prompt must contain the hard length rule keyword")
+	assert.Contains(
+		t,
+		g.systemPrompt,
+		"Минимум — одно полное предложение",
+		"system prompt must contain an explicit length floor so the model does not collapse to 1-2 word replies",
+	)
 
 	// Каждый <example>...</example> блок не должен превышать 150 рун содержимого.
 	const wantMax = 150
@@ -328,6 +335,78 @@ func TestGenerator_ReloadMessages_PromptHasLengthRuleAndShortExamples(t *testing
 			"example body must be <= %d runes, got: %q", wantMax, body)
 		rest = rest[i+j+len(exEnd):]
 	}
+}
+
+// errAiFailure mirrors deepseek.ErrResponseTruncated semantically: any error
+// from the AI client that is NOT the internal errGenerationUnavailable sentinel
+// must drive Generator to the list-based fallback. We can't import the real
+// sentinel because that would form an import cycle (deepseek -> message), so
+// we use a stand-in error — the contract under test is "non-internal error
+// from ai.Chat → list-based fallback", independent of which concrete error
+// the production deepseek client returns.
+var errAiFailure = errors.New("ai response unusable")
+
+func TestGenerator_GetMessageText_AiReturnsTruncatedError_FallsBackToList(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	aiMock := NewMockai(ctrl)
+	rnd := NewMockrandomizer(ctrl)
+	filter := NewMockmeaningfullFilter(ctrl)
+	logger := NewMocklogger(ctrl)
+
+	rnd.EXPECT().Float32().Return(float32(0.0))
+	filter.EXPECT().IsMeaningfulPhrase("привет").Return(true)
+	aiMock.EXPECT().Chat(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errAiFailure)
+	logger.EXPECT().WithError(gomock.Any(), errAiFailure).Return(context.Background())
+	logger.EXPECT().Warn(gomock.Any(), gomock.Any())
+	rnd.EXPECT().Intn(2).Return(1)
+
+	g := &Generator{
+		r:                 rnd,
+		ai:                aiMock,
+		meaningfullFilter: filter,
+		logger:            logger,
+		messages:          []string{"list-a", "list-b"},
+		systemPrompt:      "SYS",
+	}
+
+	res := g.GetMessageText("привет", 1.0)
+
+	assert.Equal(t, ByListGenerationStrategy, res.Strategy)
+	assert.Equal(t, "list-b", res.Message)
+	assert.NotEmpty(t, res.Message)
+}
+
+func TestGenerator_WithHistory_AiReturnsTruncatedError_FallsBackToList(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	aiMock := NewMockai(ctrl)
+	rnd := NewMockrandomizer(ctrl)
+	filter := NewMockmeaningfullFilter(ctrl)
+	logger := NewMocklogger(ctrl)
+
+	aiMock.EXPECT().Chat(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errAiFailure)
+	logger.EXPECT().WithError(gomock.Any(), errAiFailure).Return(context.Background())
+	logger.EXPECT().Warn(gomock.Any(), gomock.Any())
+	rnd.EXPECT().Intn(1).Return(0)
+
+	g := &Generator{
+		r:                 rnd,
+		ai:                aiMock,
+		meaningfullFilter: filter,
+		logger:            logger,
+		messages:          []string{"fallback-line"},
+		systemPrompt:      "SYS",
+	}
+
+	history := []chathistory.Entry{{ID: 1, Author: "@alice", Text: "нечто"}}
+	res := g.GetMessageTextWithHistory(history, 0.0, true)
+
+	assert.Equal(t, ByListGenerationStrategy, res.Strategy)
+	assert.Equal(t, "fallback-line", res.Message)
+	assert.NotEmpty(t, res.Message)
 }
 
 func TestGenerator_GetMessageText_TrimsToThreeSentencesMax(t *testing.T) {

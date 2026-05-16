@@ -149,7 +149,8 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	description = message.SanitizeText(description, 1000)
 
 	author := formatAuthor(sender)
-	promptText := buildPrompt(msg.Caption, description)
+	origin := extractPhotoOrigin(msg, sender)
+	promptText := buildPrompt(origin, msg.Caption, description)
 
 	replyToID := 0
 	if msg.ReplyTo != nil {
@@ -234,14 +235,29 @@ func formatAuthor(user *telebot.User) string {
 	return message.SanitizeAuthor(user.Username, user.FirstName, user.ID, user.IsBot)
 }
 
+// photoOrigin carries the metadata needed to render the <context> line inside
+// <photo>. Author is always populated. The two ForwardedFrom* fields are
+// mutually exclusive in real Telegram payloads; if both happen to be set,
+// channel framing wins (see buildPrompt).
+type photoOrigin struct {
+	Author               string
+	ForwardedFromChannel string
+	ForwardedFromUser    string
+}
+
 // buildPrompt assembles the photo description as a self-contained tag tree
 // that the prompt builder can drop in verbatim. The caller MUST pass an
 // already-sanitized `description` (see SanitizeText in Handle), so the only
-// untrusted leaf left for us to defang is `caption`.
-func buildPrompt(caption, description string) string {
+// untrusted leaf left for us to defang is `caption`. Fields inside `origin`
+// must already be sanitized by extractPhotoOrigin.
+func buildPrompt(origin photoOrigin, caption, description string) string {
 	var sb strings.Builder
 
 	sb.WriteString("<photo>")
+
+	sb.WriteString("<context>")
+	sb.WriteString(formatContext(origin))
+	sb.WriteString("</context>")
 
 	if caption != "" {
 		sb.WriteString("<caption>")
@@ -255,4 +271,65 @@ func buildPrompt(caption, description string) string {
 	sb.WriteString("</photo>")
 
 	return sb.String()
+}
+
+// formatContext renders the natural-language framing the LLM sees: who sent
+// the photo and, if applicable, where it was forwarded from. Channel framing
+// takes precedence over user framing because a channel forward is the more
+// specific signal (and Telegram never sets both in practice).
+func formatContext(o photoOrigin) string {
+	var b strings.Builder
+	b.WriteString(o.Author)
+	b.WriteString(" скинул картинку в чат")
+	switch {
+	case o.ForwardedFromChannel != "":
+		b.WriteString(", переслано из канала ")
+		b.WriteString(o.ForwardedFromChannel)
+	case o.ForwardedFromUser != "":
+		b.WriteString(", переслано от ")
+		b.WriteString(o.ForwardedFromUser)
+	}
+	return b.String()
+}
+
+// extractPhotoOrigin maps the relevant fields of a Telegram message to a
+// sanitized photoOrigin. All user-controlled strings (channel title, anonymous
+// forward name) are run through SanitizeText so they cannot break out of the
+// <context> wrapper.
+func extractPhotoOrigin(msg *telebot.Message, sender *telebot.User) photoOrigin {
+	o := photoOrigin{Author: formatAuthor(sender)}
+
+	if msg.OriginalChat != nil {
+		if name := channelDisplay(msg.OriginalChat); name != "" {
+			o.ForwardedFromChannel = name
+			return o
+		}
+	}
+
+	if msg.OriginalSender != nil {
+		o.ForwardedFromUser = formatAuthor(msg.OriginalSender)
+		return o
+	}
+
+	if msg.OriginalSenderName != "" {
+		o.ForwardedFromUser = message.SanitizeText(msg.OriginalSenderName, 64)
+	}
+
+	return o
+}
+
+// channelDisplay produces the prompt-safe label for a forwarded-from channel.
+// Public channels carry a @username which is already alphabet-restricted by
+// Telegram; private channels only expose a free-form title that must be
+// sanitized and wrapped in guillemets so the model parses it as a name rather
+// than as a continuation of the sentence.
+func channelDisplay(c *telebot.Chat) string {
+	if c.Username != "" {
+		return "@" + c.Username
+	}
+	title := message.SanitizeText(c.Title, 64)
+	if title == "" {
+		return ""
+	}
+	return "«" + title + "»"
 }
