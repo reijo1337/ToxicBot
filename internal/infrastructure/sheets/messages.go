@@ -1,7 +1,6 @@
 package sheets
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -39,7 +38,7 @@ func (r *Repository) GetEnabledNicknames() ([]string, error) {
 func getEditableMessagesFromSheet(sheets sheets, name string) ([]string, error) {
 	spreadsheet, err := sheets.GetSpreadsheet()
 	if err != nil {
-		return nil, errors.New("can't get spreadsheet")
+		return nil, fmt.Errorf("can't get spreadsheet: %w", err)
 	}
 
 	sheet, err := spreadsheet.SheetByTitle(name)

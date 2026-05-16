@@ -128,6 +128,77 @@ func TestChat_WrapsHTTPErrors(t *testing.T) {
 		"errors must be wrapped with a context-friendly prefix")
 }
 
+func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsLength(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Mirrors what DeepSeek sends when max_tokens cuts the reply: the
+		// content is whatever the model managed to emit, finish_reason=length.
+		_, _ = w.Write(
+			[]byte(
+				`{"choices":[{"finish_reason":"length","message":{"content":"Моя мать вкалывает как лошадь, а не про"}}]}`,
+			),
+		)
+	}))
+	defer srv.Close()
+
+	c := newClientForTest(t, srv)
+	out, err := c.Chat(
+		context.Background(),
+		message.LLMMessage{Role: message.RoleUser, Content: "hi"},
+	)
+	assert.Empty(t, out, "truncated content must NOT leak to the caller")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrResponseTruncated)
+}
+
+func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// finish_reason=content_filter: safety layer wiped or partially
+		// replaced the body. Shipping it would surface as an empty / mangled
+		// bot reply, so the client must drop it and signal a fallback.
+		_, _ = w.Write(
+			[]byte(
+				`{"choices":[{"finish_reason":"content_filter","message":{"content":""}}]}`,
+			),
+		)
+	}))
+	defer srv.Close()
+
+	c := newClientForTest(t, srv)
+	out, err := c.Chat(
+		context.Background(),
+		message.LLMMessage{Role: message.RoleUser, Content: "hi"},
+	)
+	assert.Empty(t, out, "filtered content must NOT leak to the caller")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrResponseTruncated)
+}
+
+func TestChat_ReturnsContentWhenFinishReasonIsStop(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(
+			[]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"Иди отсюда."}}]}`),
+		)
+	}))
+	defer srv.Close()
+
+	c := newClientForTest(t, srv)
+	out, err := c.Chat(
+		context.Background(),
+		message.LLMMessage{Role: message.RoleUser, Content: "hi"},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "Иди отсюда.", out)
+}
+
 func TestChat_SendsMaxTokensAndTemperature(t *testing.T) {
 	t.Parallel()
 

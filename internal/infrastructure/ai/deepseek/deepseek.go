@@ -10,6 +10,15 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 )
 
+// ErrResponseTruncated is returned when DeepSeek signals that the reply
+// content is unusable: either cut off by max_tokens (`finish_reason:
+// "length"`) or blocked by the safety filter (`finish_reason:
+// "content_filter"`, which leaves Content empty or partial). In both cases
+// shipping the body produces visible breakage, so callers should fall back
+// to the list-based generator. The error name is historical — the contract
+// is "content is not safe to ship", not specifically "truncated".
+var ErrResponseTruncated = errors.New("deepseek response unusable")
+
 // Client is a thin DeepSeek wrapper on top of the official OpenAI Go SDK.
 // DeepSeek exposes an OpenAI-compatible Chat Completions endpoint, so we
 // reuse the SDK by pointing it at https://api.deepseek.com/v1.
@@ -65,7 +74,21 @@ func (c *Client) Chat(
 	if len(resp.Choices) == 0 {
 		return "", errors.New("no choices in response")
 	}
-	return resp.Choices[0].Message.Content, nil
+	switch resp.Choices[0].FinishReason {
+	case "", "stop", "tool_calls":
+		// Normal successful completions: empty (legacy DeepSeek responses
+		// occasionally omit the field), "stop" (model finished naturally),
+		// "tool_calls" (function-calling handoff — content is fine).
+		return resp.Choices[0].Message.Content, nil
+	default:
+		// "length" — model hit max_tokens, content ends mid-thought / mid-word.
+		// "content_filter" — safety filter wiped the body, content is empty
+		// or partial. Any unknown future reason is treated the same way:
+		// drop the content, surface the sentinel, let the caller fall back
+		// to the list-based generator. No retry: both states are deterministic
+		// for the same prompt — retrying would just burn the budget.
+		return "", ErrResponseTruncated
+	}
 }
 
 func toSDKMessages(in []message.LLMMessage) []openai.ChatCompletionMessageParamUnion {

@@ -16,12 +16,12 @@ A Go-based Telegram bot that trolls users in group chats. Combines text generati
 
 ```text
 cmd/main.go                              — entry point, dependency injection
-db/migrations/                           — SQLite SQL migrations (4 пары up/down)
+db/migrations/                           — SQLite SQL migrations (5 пар up/down)
 internal/
   config/config.go                       — env-based configuration (общие настройки бота)
   domain/chat/settings.go                — ChatSettings domain model
   features/
-    chathistory/                         — in-memory буфер истории чата (для контекста LLM)
+    chathistory/                         — буфер истории чата (in-memory + lazy persist в SQLite-таблицу `chat_history`)
     chatsettings/provider.go             — chat settings provider с кешем (1 min TTL)
     message/                             — message generation engine (list-based + LLM, sanitize, history prompt)
     phrase_filter/                       — meaningfulness filter for AI
@@ -102,7 +102,7 @@ Live в `internal/features/message/`. Две стратегии:
 LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaChat). Клиент DeepSeek построен на официальном SDK `github.com/openai/openai-go/v3` через переопределённый `BaseURL`. У генератора два метода:
 
 - `GetMessageText(replyTo, aiChance)` — одиночная реплика без контекста.
-- `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory, размер 100 сообщений; см. `cmd/main.go:118`).
+- `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory кеш размером 100 сообщений, lazy-load из SQLite-таблицы `chat_history` при первом обращении к chatID; см. `cmd/main.go:118`).
 
 Ответ LLM прогоняется через `sanitize.go` (фильтрация артефактов) и `phrase_filter` (проверка на осмысленность).
 
@@ -156,7 +156,7 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint override (SDK appends `/chat/completions`) |
 | `DEEPSEEK_TIMEOUT` | 30s | DeepSeek request timeout |
 | `DEEPSEEK_MAX_RETRIES` | 3 | DeepSeek retry budget |
-| `DEEPSEEK_MAX_TOKENS` | 220 | Hard cap на длину ответа в токенах (~270-330 рус. символов; перекрывает лимит 300 рун, который применяет постпроцессинг) |
+| `DEEPSEEK_MAX_TOKENS` | 500 | Hard cap на длину ответа в токенах. Запас над целью «300 рун»: BPE-токенайзер DeepSeek для кириллицы — примерно 1-2 символа на токен, плюс модель часто эмитирует обёртку `<msg ...></msg>` поверх полезного контента. При `finish_reason: "length"` deepseek-клиент возвращает `ErrResponseTruncated`, бот фолбэчится на list-based — слишком тесный лимит шуршит логами warning'ами и режет AI-ветку. |
 | `DEEPSEEK_TEMPERATURE` | 1.1 | Sampling temperature (0-2). Между DeepSeek-дефолтом 1.0 и рекомендацией 1.3 для general chat — чуть собраннее, чтобы модель следовала правилу длины |
 | `GIGACHAT_SCOPE` | `GIGACHAT_API_PERS` | GigaChat OAuth scope |
 | `GIGACHAT_MODEL` | `GigaChat-Pro` | GigaChat model name |
@@ -198,6 +198,7 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 | `make fmt` | Форматирование через golangci-lint |
 | `make migration name=<slug>` | Создать пустую пару up/down-миграций в `db/migrations/` |
 | `make align` | Авто-выравнивание полей структур (`fieldalignment -fix`) |
+| `make release-patch` / `release-minor` / `release-major` | Создать и запушить новый семвер-тег (триггерит pipeline `Труба`). Только с master, чистого working tree, синхронизированного с origin. Спрашивает `[y/N]` перед push'ем. |
 
 Тесты: `go test ./...` (отдельной make-цели нет).
 
@@ -213,3 +214,5 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 ## Gotchas
 
 - `CLAUDE.md` — симлинк на `AGENTS.md`. Редактировать нужно `AGENTS.md`; не перезаписывать `CLAUDE.md` как обычный файл.
+- При ошибке LLM (DeepSeek / GigaChat) генератор сообщений автоматически падает на list-based стратегию (Google Sheets) — отсутствие LLM-ключей не ломает бота, просто отключает AI-ветку.
+- `chathistory.Buffer` загружает историю из SQLite **только при первом обращении к chatID после старта** (`ensureLoadedLocked`); до этого момента `data[chatID]` пуст. Не путать с потерей данных.
