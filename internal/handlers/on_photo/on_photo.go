@@ -299,6 +299,10 @@ func formatContext(o photoOrigin) string {
 func extractPhotoOrigin(msg *telebot.Message, sender *telebot.User) photoOrigin {
 	o := photoOrigin{Author: formatAuthor(sender)}
 
+	if msg.AutomaticForward {
+		return o
+	}
+
 	if msg.OriginalChat != nil {
 		if name := channelDisplay(msg.OriginalChat); name != "" {
 			o.ForwardedFromChannel = name

@@ -550,6 +550,46 @@ func TestExtractPhotoOrigin_OriginalChatCollapsesToEmpty_NoTrailingPreposition(t
 	assert.NotContains(t, ctx, "переслано из канала")
 }
 
+func TestExtractPhotoOrigin_AutomaticForward_IgnoresForwardedFromChannel(t *testing.T) {
+	t.Parallel()
+
+	sender := &telebot.User{ID: 7, FirstName: "Alice", Username: "alice"}
+	msg := &telebot.Message{
+		ID:    1,
+		Photo: &telebot.Photo{},
+		OriginalChat: &telebot.Chat{
+			Type:     telebot.ChatChannel,
+			Username: "memes",
+			Title:    "Memes Channel",
+		},
+		AutomaticForward: true,
+	}
+
+	got := extractPhotoOrigin(msg, sender)
+
+	assert.Empty(t, got.ForwardedFromChannel)
+	assert.Empty(t, got.ForwardedFromUser)
+	assert.Equal(t, "@alice", got.Author)
+}
+
+func TestExtractPhotoOrigin_AutomaticForward_IgnoresOriginalSender(t *testing.T) {
+	t.Parallel()
+
+	sender := &telebot.User{ID: 7, FirstName: "Alice", Username: "alice"}
+	msg := &telebot.Message{
+		ID:               1,
+		Photo:            &telebot.Photo{},
+		OriginalSender:   &telebot.User{ID: 8, FirstName: "Вася", Username: "vasya"},
+		AutomaticForward: true,
+	}
+
+	got := extractPhotoOrigin(msg, sender)
+
+	assert.Empty(t, got.ForwardedFromChannel)
+	assert.Empty(t, got.ForwardedFromUser)
+	assert.Equal(t, "@alice", got.Author)
+}
+
 func TestExtractPhotoOrigin_OriginalChatEmpty_FallsThroughToOriginalSender(t *testing.T) {
 	t.Parallel()
 
