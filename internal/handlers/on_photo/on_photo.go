@@ -169,7 +169,8 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 
 	history := h.history.Get(chat.ID)
 	history = append(history, userEntry)
-	result := h.generator.GetMessageTextWithHistory(history, 1.0, true)
+	steering := message.BuildPhotoSteering(h.r)
+	result := h.generator.GetMessageTextWithHistoryAndSteering(history, 1.0, true, steering)
 
 	go h.statIncer.Inc(
 		h.ctx,

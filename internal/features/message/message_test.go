@@ -435,3 +435,57 @@ func TestGenerator_GetMessageText_TrimsToThreeSentencesMax(t *testing.T) {
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "Один. Два. Три.", res.Message)
 }
+
+// newCapturingGenerator wires a Generator whose ai mock captures the messages
+// passed to Chat (exactly once), so steering tests can assert on the assembled
+// system prompt. systemPrompt is fixed to "SYS".
+func newCapturingGenerator(t *testing.T, captured *[]LLMMessage) *Generator {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	aiMock := NewMockai(ctrl)
+	aiMock.EXPECT().
+		Chat(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, msgs ...LLMMessage) (string, error) {
+			*captured = msgs
+			return "ответ", nil
+		})
+	return &Generator{ai: aiMock, systemPrompt: "SYS"}
+}
+
+func steeringTestHistory() []chathistory.Entry {
+	return []chathistory.Entry{
+		{ID: 1, Time: time.Date(2026, 4, 24, 14, 0, 0, 0, time.UTC), Author: "@a", Text: "привет"},
+	}
+}
+
+func TestGenerator_WithHistoryAndSteering_AppendsToSystem(t *testing.T) {
+	t.Parallel()
+
+	var captured []LLMMessage
+	g := newCapturingGenerator(t, &captured)
+
+	res := g.GetMessageTextWithHistoryAndSteering(
+		steeringTestHistory(),
+		1.0,
+		true,
+		"STEER-DIRECTIVE",
+	)
+
+	require.Equal(t, AiGenerationStrategy, res.Strategy)
+	require.NotEmpty(t, captured)
+	assert.Equal(t, RoleSystem, captured[0].Role)
+	assert.Contains(t, captured[0].Content, "SYS")
+	assert.Contains(t, captured[0].Content, "STEER-DIRECTIVE")
+}
+
+func TestGenerator_WithHistory_EmptySteering_SystemUnchanged(t *testing.T) {
+	t.Parallel()
+
+	var captured []LLMMessage
+	g := newCapturingGenerator(t, &captured)
+
+	g.GetMessageTextWithHistory(steeringTestHistory(), 1.0, true)
+
+	require.NotEmpty(t, captured)
+	assert.Equal(t, "SYS", captured[0].Content, "при пустом steering системный промпт не меняется")
+}

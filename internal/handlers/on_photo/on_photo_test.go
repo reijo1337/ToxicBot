@@ -141,15 +141,17 @@ func TestHandle_HappyPath_WritesPairViaAddAll(t *testing.T) {
 	ctx := newCtx(msg, goodSender())
 
 	var capturedHistory []chathistory.Entry
+	var capturedSteering string
 	var capturedPair []chathistory.Entry
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{
 			{ID: 1, Author: "@bob", Text: "past"},
 		}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
-			DoAndReturn(func(h []chathistory.Entry, _ float32, _ bool) message.GenerationResult {
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			DoAndReturn(func(h []chathistory.Entry, _ float32, _ bool, steering string) message.GenerationResult {
 				capturedHistory = h
+				capturedSteering = steering
 				return message.GenerationResult{
 					Message:  "отвали",
 					Strategy: message.AiGenerationStrategy,
@@ -162,6 +164,10 @@ func TestHandle_HappyPath_WritesPairViaAddAll(t *testing.T) {
 	)
 
 	require.NoError(t, env.handler.Handle(ctx))
+
+	// steering must come from message.BuildPhotoSteering (non-empty, carries the rule)
+	assert.NotEmpty(t, capturedSteering)
+	assert.Contains(t, capturedSteering, `НЕ начинай реплику со слова "О"`)
 
 	// historyForLLM must equal past + trigger (2 items)
 	require.Len(t, capturedHistory, 2)
@@ -263,7 +269,7 @@ func TestHandle_ReplierError_NoAddAll(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "бля", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "бля").Return(nil, errors.New("telegram down")),
 	)
@@ -287,7 +293,7 @@ func TestHandle_AlbumDedup_SkipsSecondPhotoInSameAlbum(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(first, "ok").Return(&telebot.Message{ID: 60}, nil),
 		env.history.EXPECT().AddAll(testChatID, gomock.Any(), gomock.Any()),
@@ -626,7 +632,7 @@ func TestHandle_LongDescriptionTruncatedAndWrapped(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -660,7 +666,7 @@ func TestHandle_DescriptionWithClosingTagSanitized(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -731,7 +737,7 @@ func TestHandle_ForwardedFromChannel_HistoryEntryMentionsChannelInContext(t *tes
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -762,7 +768,7 @@ func TestHandle_ForwardedFromUser_HistoryEntryMentionsOriginalSender(t *testing.
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -793,7 +799,7 @@ func TestHandle_UsesFirstNameWhenUsernameEmpty(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistory(gomock.Any(), float32(1.0), true).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
