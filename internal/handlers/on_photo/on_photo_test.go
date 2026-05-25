@@ -832,7 +832,10 @@ func TestHandle_FiltersBotEntriesFromLLMHistory(t *testing.T) {
 			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
 			DoAndReturn(func(h []chathistory.Entry, _ float32, _ bool, _ string) message.GenerationResult {
 				capturedHistory = h
-				return message.GenerationResult{Message: "отвали", Strategy: message.AiGenerationStrategy}
+				return message.GenerationResult{
+					Message:  "отвали",
+					Strategy: message.AiGenerationStrategy,
+				}
 			}),
 		env.replier.EXPECT().Reply(msg, "отвали").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().AddAll(testChatID, gomock.Any(), gomock.Any()),
