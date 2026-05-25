@@ -811,3 +811,42 @@ func TestHandle_UsesFirstNameWhenUsernameEmpty(t *testing.T) {
 	require.Len(t, capturedPair, 2)
 	assert.Equal(t, "Боб", capturedPair[0].Author)
 }
+
+func TestHandle_FiltersBotEntriesFromLLMHistory(t *testing.T) {
+	t.Parallel()
+
+	env := newTestEnv(t)
+	env.setupPhotoPipeline("кот ест торт")
+
+	msg := photoMessage(50, "смотри", replyToBotMessage())
+	ctx := newCtx(msg, goodSender())
+
+	var capturedHistory []chathistory.Entry
+	gomock.InOrder(
+		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{
+			{ID: 1, Author: "@bob", Text: "u1", FromBot: false},
+			{ID: 2, Author: testBotAuthor, Text: `О, "кличка" вылез!`, FromBot: true},
+			{ID: 3, Author: "@carol", Text: "u2", FromBot: false},
+		}),
+		env.generator.EXPECT().
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			DoAndReturn(func(h []chathistory.Entry, _ float32, _ bool, _ string) message.GenerationResult {
+				capturedHistory = h
+				return message.GenerationResult{Message: "отвали", Strategy: message.AiGenerationStrategy}
+			}),
+		env.replier.EXPECT().Reply(msg, "отвали").Return(&telebot.Message{ID: 51}, nil),
+		env.history.EXPECT().AddAll(testChatID, gomock.Any(), gomock.Any()),
+	)
+
+	require.NoError(t, env.handler.Handle(ctx))
+
+	for _, e := range capturedHistory {
+		assert.False(t, e.FromBot, "bot entry leaked into LLM history: %q", e.Text)
+	}
+
+	require.Len(t, capturedHistory, 3)
+	assert.Equal(t, "u1", capturedHistory[0].Text)
+	assert.Equal(t, "u2", capturedHistory[1].Text)
+	assert.Equal(t, "@alice", capturedHistory[2].Author)
+	assert.Contains(t, capturedHistory[2].Text, "кот ест торт")
+}

@@ -168,6 +168,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	history := h.history.Get(chat.ID)
+	history = dropBotEntries(history)
 	history = append(history, userEntry)
 	steering := message.BuildPhotoSteering(h.r)
 	result := h.generator.GetMessageTextWithHistoryAndSteering(history, 1.0, true, steering)
