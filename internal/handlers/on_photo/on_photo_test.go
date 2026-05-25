@@ -849,6 +849,7 @@ func TestHandle_FiltersBotEntriesFromLLMHistory(t *testing.T) {
 	}
 	assert.Equal(t, "u1", capturedHistory[0].Text)
 	assert.Equal(t, "u2", capturedHistory[1].Text)
+	// "@alice" = formatAuthor(goodSender()), i.e. "@" + Username.
 	assert.Equal(t, "@alice", capturedHistory[2].Author)
 	assert.Contains(t, capturedHistory[2].Text, "кот ест торт")
 }
@@ -881,12 +882,18 @@ func TestDropBotEntries_DoesNotMutateInput(t *testing.T) {
 		{ID: 2, Text: "b1", FromBot: true},
 	}
 
-	_ = dropBotEntries(in)
+	got := dropBotEntries(in)
 
 	require.Len(t, in, 2)
 	assert.Equal(t, "u1", in[0].Text)
 	assert.Equal(t, "b1", in[1].Text)
 	assert.True(t, in[1].FromBot)
+
+	// Output must not alias the input's backing array, otherwise a later
+	// append by the caller could clobber buffer-owned entries.
+	if len(got) > 0 {
+		assert.NotSame(t, &in[0], &got[0])
+	}
 }
 
 func TestDropBotEntries_EmptyAndEdgeCases(t *testing.T) {
