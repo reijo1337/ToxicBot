@@ -17,10 +17,11 @@ type imageDescriber interface {
 }
 
 type messageGenerator interface {
-	GetMessageTextWithHistory(
+	GetMessageTextWithHistoryAndSteering(
 		history []chathistory.Entry,
 		aiChance float32,
 		forceAI bool,
+		steering string,
 	) message.GenerationResult
 }
 

@@ -85,18 +85,18 @@ func (m *MockmessageGenerator) EXPECT() *MockmessageGeneratorMockRecorder {
 	return m.recorder
 }
 
-// GetMessageTextWithHistory mocks base method.
-func (m *MockmessageGenerator) GetMessageTextWithHistory(history []chathistory.Entry, aiChance float32, forceAI bool) message.GenerationResult {
+// GetMessageTextWithHistoryAndSteering mocks base method.
+func (m *MockmessageGenerator) GetMessageTextWithHistoryAndSteering(history []chathistory.Entry, aiChance float32, forceAI bool, steering string) message.GenerationResult {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMessageTextWithHistory", history, aiChance, forceAI)
+	ret := m.ctrl.Call(m, "GetMessageTextWithHistoryAndSteering", history, aiChance, forceAI, steering)
 	ret0, _ := ret[0].(message.GenerationResult)
 	return ret0
 }
 
-// GetMessageTextWithHistory indicates an expected call of GetMessageTextWithHistory.
-func (mr *MockmessageGeneratorMockRecorder) GetMessageTextWithHistory(history, aiChance, forceAI any) *gomock.Call {
+// GetMessageTextWithHistoryAndSteering indicates an expected call of GetMessageTextWithHistoryAndSteering.
+func (mr *MockmessageGeneratorMockRecorder) GetMessageTextWithHistoryAndSteering(history, aiChance, forceAI, steering any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextWithHistory", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextWithHistory), history, aiChance, forceAI)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextWithHistoryAndSteering", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextWithHistoryAndSteering), history, aiChance, forceAI, steering)
 }
 
 // MocksettingsProvider is a mock of settingsProvider interface.

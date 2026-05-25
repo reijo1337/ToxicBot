@@ -180,7 +180,20 @@ func (g *Generator) GetMessageTextWithHistory(
 	aiChance float32,
 	forceAI bool,
 ) GenerationResult {
-	text, err := g.generateAiWithHistory(history, aiChance, forceAI)
+	return g.GetMessageTextWithHistoryAndSteering(history, aiChance, forceAI, "")
+}
+
+// GetMessageTextWithHistoryAndSteering works like GetMessageTextWithHistory but
+// appends an extra, call-scoped directive (`steering`) to the system prompt of
+// this single AI call. Used by the photo handler to break the repeated photo
+// template; empty steering reproduces the plain behaviour.
+func (g *Generator) GetMessageTextWithHistoryAndSteering(
+	history []chathistory.Entry,
+	aiChance float32,
+	forceAI bool,
+	steering string,
+) GenerationResult {
+	text, err := g.generateAiWithHistory(history, aiChance, forceAI, steering)
 	if err == nil {
 		return GenerationResult{
 			Message:  text,
@@ -207,6 +220,7 @@ func (g *Generator) generateAiWithHistory(
 	history []chathistory.Entry,
 	aiChance float32,
 	forceAI bool,
+	steering string,
 ) (string, error) {
 	if len(history) == 0 {
 		return "", errGenerationUnavailable
@@ -226,6 +240,12 @@ func (g *Generator) generateAiWithHistory(
 	g.mu.RLock()
 	system := g.systemPrompt
 	g.mu.RUnlock()
+
+	if steering != "" {
+		// Пустая строка отделяет базовый промпт от call-scoped подсказки —
+		// модель читает их как два самостоятельных блока инструкций.
+		system = system + "\n\n" + steering
+	}
 
 	msgs := buildChatCompletions(system, history)
 	out, err := g.ai.Chat(context.Background(), msgs...)
