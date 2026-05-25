@@ -339,3 +339,18 @@ func channelDisplay(c *telebot.Chat) string {
 	}
 	return "«" + title + "»"
 }
+
+// dropBotEntries filters out the bot's own replies (FromBot == true) from
+// history. This stops the model imitating its past messages as few-shot
+// examples, which would snowball the repeated photo template («О, "кличка" вылез…»).
+// The input slice is never mutated.
+func dropBotEntries(history []chathistory.Entry) []chathistory.Entry {
+	out := make([]chathistory.Entry, 0, len(history))
+	for _, e := range history {
+		if e.FromBot {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
