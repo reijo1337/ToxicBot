@@ -168,6 +168,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	history := h.history.Get(chat.ID)
+	history = dropBotEntries(history)
 	history = append(history, userEntry)
 	steering := message.BuildPhotoSteering(h.r)
 	result := h.generator.GetMessageTextWithHistoryAndSteering(history, 1.0, true, steering)
@@ -337,4 +338,19 @@ func channelDisplay(c *telebot.Chat) string {
 		return ""
 	}
 	return "«" + title + "»"
+}
+
+// dropBotEntries filters out the bot's own replies (FromBot == true) from
+// history. This stops the model imitating its past messages as few-shot
+// examples, which would snowball the repeated photo template («О, "кличка" вылез…»).
+// The input slice is never mutated.
+func dropBotEntries(history []chathistory.Entry) []chathistory.Entry {
+	out := make([]chathistory.Entry, 0, len(history))
+	for _, e := range history {
+		if e.FromBot {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
 }
