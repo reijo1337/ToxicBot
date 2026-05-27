@@ -67,7 +67,17 @@ func (c *Client) Chat(
 		Messages:    toSDKMessages(msgs),
 		MaxTokens:   openai.Int(c.maxTokens),
 		Temperature: openai.Float(c.temperature),
-	})
+	},
+		// DeepSeek's V4 models run thinking mode ON by default, and the reasoning
+		// tokens count against max_tokens. For a 1-3 sentence toxic reply the
+		// chain-of-thought is pure overhead: it burned ~460 of the 500-token
+		// budget, leaving the actual content truncated mid-word (finish_reason=
+		// "length") so every call fell back to list-based phrases. Disable it via
+		// the top-level `thinking` body field (DeepSeek extension, not in the SDK
+		// struct) so the whole budget goes to the answer. See
+		// https://api-docs.deepseek.com/api/create-chat-completion (Body > thinking).
+		option.WithJSONSet("thinking", map[string]string{"type": "disabled"}),
+	)
 	if err != nil {
 		return "", fmt.Errorf("deepseek chat: %w", err)
 	}
@@ -87,7 +97,22 @@ func (c *Client) Chat(
 		// drop the content, surface the sentinel, let the caller fall back
 		// to the list-based generator. No retry: both states are deterministic
 		// for the same prompt — retrying would just burn the budget.
-		return "", ErrResponseTruncated
+		//
+		// Diagnostics: the three unusable states collapse into one sentinel, but
+		// we fold the actual finish_reason and token usage into the error text so
+		// prod logs can tell them apart without the model output — "length" with
+		// high completion/reasoning tokens (model rambled past the cap) vs
+		// "content_filter" with a near-empty body (safety layer wiped it) vs an
+		// unexpected reason. errors.Is(ErrResponseTruncated) still holds via %w.
+		choice := resp.Choices[0]
+		return "", fmt.Errorf(
+			"finish_reason=%q completion_tokens=%d reasoning_tokens=%d content_len=%d: %w",
+			choice.FinishReason,
+			resp.Usage.CompletionTokens,
+			resp.Usage.CompletionTokensDetails.ReasoningTokens,
+			len(choice.Message.Content),
+			ErrResponseTruncated,
+		)
 	}
 }
 

@@ -23,6 +23,9 @@ type reqBody struct {
 	Messages    []reqMessage `json:"messages"`
 	MaxTokens   int64        `json:"max_tokens"`
 	Temperature float64      `json:"temperature"`
+	Thinking    *struct {
+		Type string `json:"type"`
+	} `json:"thinking"`
 }
 
 type reqMessage struct {
@@ -150,7 +153,13 @@ func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsLength(t *testing.T) 
 	)
 	assert.Empty(t, out, "truncated content must NOT leak to the caller")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrResponseTruncated)
+	require.ErrorIs(t, err, ErrResponseTruncated)
+	assert.Contains(
+		t,
+		err.Error(),
+		`finish_reason="length"`,
+		"finish_reason must be diagnosable from the log",
+	)
 }
 
 func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *testing.T) {
@@ -176,7 +185,13 @@ func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *test
 	)
 	assert.Empty(t, out, "filtered content must NOT leak to the caller")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrResponseTruncated)
+	require.ErrorIs(t, err, ErrResponseTruncated)
+	assert.Contains(
+		t,
+		err.Error(),
+		`finish_reason="content_filter"`,
+		"finish_reason must be diagnosable from the log",
+	)
 }
 
 func TestChat_ReturnsContentWhenFinishReasonIsStop(t *testing.T) {
@@ -226,4 +241,34 @@ func TestChat_SendsMaxTokensAndTemperature(t *testing.T) {
 
 	assert.Equal(t, int64(150), got.MaxTokens, "max_tokens must reach the API")
 	assert.InDelta(t, 1.1, got.Temperature, 0.0001, "temperature must reach the API")
+}
+
+func TestChat_DisablesThinkingMode(t *testing.T) {
+	t.Parallel()
+
+	var got reqBody
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if !assert.NoError(t, err) {
+			return
+		}
+		if !assert.NoError(t, json.Unmarshal(raw, &got)) {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+
+	c := newClientForTest(t, srv)
+	_, err := c.Chat(
+		context.Background(),
+		message.LLMMessage{Role: message.RoleUser, Content: "U"},
+	)
+	require.NoError(t, err)
+
+	// V4 reasoning tokens otherwise eat the max_tokens budget and truncate the
+	// reply (finish_reason=length). The bot's short insult never needs them.
+	require.NotNil(t, got.Thinking, "thinking field must be sent to disable reasoning")
+	assert.Equal(t, "disabled", got.Thinking.Type, "thinking mode must be disabled")
 }
