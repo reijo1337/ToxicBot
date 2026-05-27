@@ -87,7 +87,22 @@ func (c *Client) Chat(
 		// drop the content, surface the sentinel, let the caller fall back
 		// to the list-based generator. No retry: both states are deterministic
 		// for the same prompt — retrying would just burn the budget.
-		return "", ErrResponseTruncated
+		//
+		// Diagnostics: the three unusable states collapse into one sentinel, but
+		// we fold the actual finish_reason and token usage into the error text so
+		// prod logs can tell them apart without the model output — "length" with
+		// high completion/reasoning tokens (model rambled past the cap) vs
+		// "content_filter" with a near-empty body (safety layer wiped it) vs an
+		// unexpected reason. errors.Is(ErrResponseTruncated) still holds via %w.
+		choice := resp.Choices[0]
+		return "", fmt.Errorf(
+			"finish_reason=%q completion_tokens=%d reasoning_tokens=%d content_len=%d: %w",
+			choice.FinishReason,
+			resp.Usage.CompletionTokens,
+			resp.Usage.CompletionTokensDetails.ReasoningTokens,
+			len(choice.Message.Content),
+			ErrResponseTruncated,
+		)
 	}
 }
 

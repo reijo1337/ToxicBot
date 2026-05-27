@@ -151,6 +151,7 @@ func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsLength(t *testing.T) 
 	assert.Empty(t, out, "truncated content must NOT leak to the caller")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrResponseTruncated)
+	assert.Contains(t, err.Error(), `finish_reason="length"`, "finish_reason must be diagnosable from the log")
 }
 
 func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *testing.T) {
@@ -177,6 +178,7 @@ func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *test
 	assert.Empty(t, out, "filtered content must NOT leak to the caller")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrResponseTruncated)
+	assert.Contains(t, err.Error(), `finish_reason="content_filter"`, "finish_reason must be diagnosable from the log")
 }
 
 func TestChat_ReturnsContentWhenFinishReasonIsStop(t *testing.T) {
