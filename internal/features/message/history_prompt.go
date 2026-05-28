@@ -1,6 +1,7 @@
 package message
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
@@ -75,11 +76,25 @@ func buildChatCompletions(
 	system string,
 	history []chathistory.Entry,
 ) []LLMMessage {
-	msgs := make([]LLMMessage, 0, len(history)+1)
+	// The buffer preserves Add/AddAll insertion order, which diverges from
+	// chronological order: telebot processes updates concurrently and the bulling
+	// /photo handlers defer AddAll until after a slow LLM call. Sort by Time so the
+	// model sees a coherent transcript; ID (monotonic per chat) breaks same-second
+	// ties since Telegram timestamps have only second resolution.
+	sorted := make([]chathistory.Entry, len(history))
+	copy(sorted, history)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if !sorted[i].Time.Equal(sorted[j].Time) {
+			return sorted[i].Time.Before(sorted[j].Time)
+		}
+		return sorted[i].ID < sorted[j].ID
+	})
+
+	msgs := make([]LLMMessage, 0, len(sorted)+1)
 	msgs = append(msgs, LLMMessage{Role: RoleSystem, Content: system})
 
 	skipping := true
-	for _, e := range history {
+	for _, e := range sorted {
 		if skipping && e.FromBot {
 			continue
 		}
@@ -97,7 +112,7 @@ func buildChatCompletions(
 		msgs = append(msgs, LLMMessage{
 			Role:    RoleUser,
 			Name:    e.Author,
-			Content: formatUserContent(e, history),
+			Content: formatUserContent(e, sorted),
 		})
 	}
 

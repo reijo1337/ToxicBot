@@ -216,6 +216,47 @@ func TestBuildChatCompletions_SingleUser(t *testing.T) {
 	assert.Equal(t, `<msg time="2026-05-01T09:00">yo</msg>`, msgs[1].Content)
 }
 
+func TestBuildChatCompletions_OutOfOrderEntriesSortedByTime(t *testing.T) {
+	t.Parallel()
+	system := "S"
+	t1 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Minute)
+	t3 := t2.Add(time.Minute)
+	// The buffer received these out of chronological order: concurrent update
+	// handlers (telebot Synchronous=false) and deferred AddAll after a slow LLM
+	// call can interleave so an earlier message lands after a later one.
+	history := []chathistory.Entry{
+		{ID: 3, Time: t3, Author: "@carol", Text: "third", FromBot: false},
+		{ID: 1, Time: t1, Author: "@alice", Text: "first", FromBot: false},
+		{ID: 2, Time: t2, Author: "@bob", Text: "second", FromBot: false},
+	}
+
+	msgs := buildChatCompletions(system, history)
+	require.Len(t, msgs, 4)
+
+	assert.Equal(t, `<msg time="2026-05-01T10:00">first</msg>`, msgs[1].Content)
+	assert.Equal(t, `<msg time="2026-05-01T10:01">second</msg>`, msgs[2].Content)
+	assert.Equal(t, `<msg time="2026-05-01T10:02">third</msg>`, msgs[3].Content)
+}
+
+func TestBuildChatCompletions_SameSecondTieBrokenByID(t *testing.T) {
+	t.Parallel()
+	system := "S"
+	// Telegram message timestamps have second resolution, so several messages
+	// can share the same Time. Message ID (monotonic per chat) breaks the tie.
+	ts := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	history := []chathistory.Entry{
+		{ID: 12, Time: ts, Author: "@bob", Text: "later", FromBot: false},
+		{ID: 11, Time: ts, Author: "@alice", Text: "earlier", FromBot: false},
+	}
+
+	msgs := buildChatCompletions(system, history)
+	require.Len(t, msgs, 3)
+
+	assert.Contains(t, msgs[1].Content, "earlier")
+	assert.Contains(t, msgs[2].Content, "later")
+}
+
 func TestBuildChatCompletions_LeadingAssistantsAreSkipped(t *testing.T) {
 	t.Parallel()
 	system := "S"
