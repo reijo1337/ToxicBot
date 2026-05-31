@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	chatsettings "github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	message "github.com/reijo1337/ToxicBot/internal/features/message"
 	stats "github.com/reijo1337/ToxicBot/internal/features/stats"
 	gomock "go.uber.org/mock/gomock"
@@ -82,17 +83,17 @@ func (m *MockmessageGenerator) EXPECT() *MockmessageGeneratorMockRecorder {
 }
 
 // GetMessageText mocks base method.
-func (m *MockmessageGenerator) GetMessageText(prompt string, aiChance float32) message.GenerationResult {
+func (m *MockmessageGenerator) GetMessageText(ctx context.Context, prompt string, aiChance float32) message.GenerationResult {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMessageText", prompt, aiChance)
+	ret := m.ctrl.Call(m, "GetMessageText", ctx, prompt, aiChance)
 	ret0, _ := ret[0].(message.GenerationResult)
 	return ret0
 }
 
 // GetMessageText indicates an expected call of GetMessageText.
-func (mr *MockmessageGeneratorMockRecorder) GetMessageText(prompt, aiChance any) *gomock.Call {
+func (mr *MockmessageGeneratorMockRecorder) GetMessageText(ctx, prompt, aiChance any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageText", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageText), prompt, aiChance)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageText", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageText), ctx, prompt, aiChance)
 }
 
 // Mocklogger is a mock of logger interface.
@@ -250,4 +251,43 @@ func (mr *MockstatIncerMockRecorder) Inc(ctx, chatID, userID, op any, opts ...an
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, chatID, userID, op}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inc", reflect.TypeOf((*MockstatIncer)(nil).Inc), varargs...)
+}
+
+// MocksettingsProvider is a mock of settingsProvider interface.
+type MocksettingsProvider struct {
+	ctrl     *gomock.Controller
+	recorder *MocksettingsProviderMockRecorder
+	isgomock struct{}
+}
+
+// MocksettingsProviderMockRecorder is the mock recorder for MocksettingsProvider.
+type MocksettingsProviderMockRecorder struct {
+	mock *MocksettingsProvider
+}
+
+// NewMocksettingsProvider creates a new mock instance.
+func NewMocksettingsProvider(ctrl *gomock.Controller) *MocksettingsProvider {
+	mock := &MocksettingsProvider{ctrl: ctrl}
+	mock.recorder = &MocksettingsProviderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MocksettingsProvider) EXPECT() *MocksettingsProviderMockRecorder {
+	return m.recorder
+}
+
+// GetForChat mocks base method.
+func (m *MocksettingsProvider) GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetForChat", ctx, chatID)
+	ret0, _ := ret[0].(*chatsettings.Settings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetForChat indicates an expected call of GetForChat.
+func (mr *MocksettingsProviderMockRecorder) GetForChat(ctx, chatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetForChat", reflect.TypeOf((*MocksettingsProvider)(nil).GetForChat), ctx, chatID)
 }

@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/codes"
 	"gopkg.in/telebot.v3"
 )
 
@@ -21,6 +24,13 @@ func New(endpoint string, h ...subHandler) *Handler {
 }
 
 func (h *Handler) Handle(ctx telebot.Context) error {
+	goCtx, span := tracing.Tracer().Start(context.Background(), tracing.EndpointName(h.endpoint))
+	if span.IsRecording() {
+		span.SetAttributes(tracing.UpdateAttrs(ctx)...)
+	}
+	tracing.StashRootContext(ctx, goCtx)
+	defer span.End()
+
 	wg := sync.WaitGroup{}
 	wg.Add(len(h.handlers))
 
@@ -46,6 +56,8 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	if errJoin != nil {
+		span.RecordError(errJoin)
+		span.SetStatus(codes.Error, "handler error")
 		return fmt.Errorf("got some error from %s handlers: %w", h.endpoint, errJoin)
 	}
 

@@ -46,7 +46,7 @@ internal/
     storage/db/                          — storage layer (SQLite)
   usecase/                               — business logic
 pkg/                                     — shared utilities (logger, migrator, mapper)
-deploy/                                  — Kubernetes manifests
+deploy/                                  — ansible-плейбуки деплоя (Docker): бот, Jaeger/tracing, Dozzle/логи
 ```
 
 ## Handlers and Features
@@ -161,6 +161,20 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `GIGACHAT_SCOPE` | `GIGACHAT_API_PERS` | GigaChat OAuth scope |
 | `GIGACHAT_MODEL` | `GigaChat-Pro` | GigaChat model name |
 | `GIGACHAT_TIMEOUT` | 60s | GigaChat request timeout |
+
+### Tracing (опциональные)
+
+Источник — `pkg/tracing/config.go`. OpenTelemetry → OTLP → Jaeger. Когда `TRACING_ENABLED=false` (по умолчанию), стоит глобальный no-op tracer и поведение не меняется.
+
+| Variable | Default | Description |
+|---|---|---|
+| `TRACING_ENABLED` | `false` | Включить трейсинг (иначе no-op, ноль накладных) |
+| `TRACING_OTLP_ENDPOINT` | `localhost:4317` | OTLP gRPC endpoint. В проде бот шлёт на `jaeger:4317` (DNS-алиас Jaeger в общей docker-сети `toxicbot-tracing`); локально — `localhost:4317` |
+| `TRACING_SAMPLE_RATIO` | `1.0` | Доля сэмплируемых трейсов (ParentBased + TraceIDRatioBased) |
+| `TRACING_CAPTURE_CONTENT` | `true` | Захват текста промптов/ответов в спанах (`false` — только длины) |
+| `TRACING_SERVICE_NAME` | `toxicbot` | Имя сервиса в Jaeger |
+
+Инфра — отдельный ручной workflow **Deploy tracing** (`workflow_dispatch`) → плейбук `deploy/deploy-tracing.yaml`: поднимает Jaeger (`jaegertracing/all-in-one`, Badger TTL `168h` = 7 дней, данные в `/srv/ToxicBot/jaeger`) и Caddy как reverse-proxy для UI с basic-auth (порт `:16686`, секреты `JAEGER_USERNAME` / `JAEGER_PASSWORD_HASH`). Jaeger и Caddy живут на docker-сети `toxicbot-tracing`; бот подключён к той же сети и шлёт OTLP на Jaeger по DNS-алиасу `jaeger:4317` (порт на хост не публикуется). Bot-плейбук сам идемпотентно создаёт сеть, поэтому порядок деплоя не важен. Деплоится независимо от релиз-цикла бота; включение трейсинга на стороне бота — repo-variable `TRACING_ENABLED` (default `true`), читается на каждом деплое. Инструментованы: root-спан на апдейт в диспатчере (`internal/handlers/handlers.go`), дочерние спаны по хендлерам (имя из `Slug()`), `gen_ai`-спаны в deepseek/gigachat, `decision`/`sanitize` в `Generator`; теггер-тег — отдельный root с `trigger=timer`.
 
 ## Per-Chat Settings
 

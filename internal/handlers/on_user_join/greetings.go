@@ -8,6 +8,8 @@ import (
 
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
 
@@ -49,6 +51,10 @@ func New(
 }
 
 func (g *Greetings) Handle(ctx telebot.Context) error {
+	_, span := tracing.StartHandlerSpan(ctx, g.Slug())
+	defer span.End()
+	span.SetAttributes(attribute.String("outcome", "react"))
+
 	randomIndex := g.r.Intn(len(g.messages))
 	text := g.messages[randomIndex]
 

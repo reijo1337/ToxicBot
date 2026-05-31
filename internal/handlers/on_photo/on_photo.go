@@ -12,6 +12,8 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
 
@@ -96,6 +98,9 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		}
 	}
 
+	spanCtx, span := tracing.StartHandlerSpan(ctx, h.Slug())
+	defer span.End()
+
 	isReply := h.isReplyToBot(ctx)
 
 	if !isReply {
@@ -105,6 +110,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		}
 
 		if h.r.Float32() > settings.PhotoReactChance {
+			span.SetAttributes(attribute.String("outcome", "skip"))
 			return nil
 		}
 	}
@@ -115,6 +121,8 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 			h.logger.WithError(h.ctx, err),
 			"can't download photo",
 		)
+		span.SetAttributes(attribute.String("outcome", "error"))
+		span.RecordError(err)
 		return nil
 	}
 
@@ -124,6 +132,8 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 			h.logger.WithError(h.ctx, err),
 			"can't get photo reader",
 		)
+		span.SetAttributes(attribute.String("outcome", "error"))
+		span.RecordError(err)
 		return nil
 	}
 	defer reader.Close() //nolint
@@ -134,15 +144,19 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 			h.logger.WithError(h.ctx, err),
 			"can't read photo bytes",
 		)
+		span.SetAttributes(attribute.String("outcome", "error"))
+		span.RecordError(err)
 		return nil
 	}
 
-	description, err := h.describer.GenerateContent(h.ctx, describePrompt, imageBytes)
+	description, err := h.describer.GenerateContent(spanCtx, describePrompt, imageBytes)
 	if err != nil {
 		h.logger.Warn(
 			h.logger.WithError(h.ctx, err),
 			"can't describe image",
 		)
+		span.SetAttributes(attribute.String("outcome", "error"))
+		span.RecordError(err)
 		return nil
 	}
 
@@ -171,7 +185,18 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	history = dropBotEntries(history)
 	history = append(history, userEntry)
 	steering := message.BuildPhotoSteering(h.r)
-	result := h.generator.GetMessageTextWithHistoryAndSteering(history, 1.0, true, steering)
+	span.SetAttributes(tracing.ContentAttr("steering", steering))
+	result := h.generator.GetMessageTextWithHistoryAndSteering(
+		spanCtx,
+		history,
+		1.0,
+		true,
+		steering,
+	)
+	span.SetAttributes(
+		attribute.String("outcome", "react"),
+		attribute.String("strategy", message.StrategyName(result.Strategy)),
+	)
 
 	go h.statIncer.Inc(
 		h.ctx,
@@ -190,6 +215,7 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	if err != nil {
 		return err
 	}
+	span.SetAttributes(attribute.Int("telegram.sent_message_id", sent.ID))
 
 	botEntry := chathistory.Entry{
 		ID:        sent.ID,

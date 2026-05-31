@@ -11,6 +11,8 @@ import (
 
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
 
@@ -63,16 +65,25 @@ func (i *Handler) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
+	_, span := tracing.StartHandlerSpan(ctx, i.Slug())
+	defer span.End()
+
 	if i.random.Intn(i.chance) != 0 {
+		span.SetAttributes(
+			attribute.String("outcome", "skip"),
+			attribute.String("reason", "chance"),
+		)
 		return nil
 	}
 
 	messages, err := i.repository.GetEnabledMessages()
 	if err != nil {
+		span.RecordError(err)
 		return fmt.Errorf("can't get messages from repositorey: %w", err)
 	}
 
 	if idx := i.random.Intn(len(messages)); idx == 0 {
+		span.SetAttributes(attribute.String("outcome", "react"))
 		go i.statIncer.Inc(
 			i.ctx,
 			pointer.From(ctx.Chat()).ID,
@@ -83,5 +94,9 @@ func (i *Handler) Handle(ctx telebot.Context) error {
 		return ctx.Reply(messages[idx])
 	}
 
+	span.SetAttributes(
+		attribute.String("outcome", "skip"),
+		attribute.String("reason", "message_index"),
+	)
 	return nil
 }

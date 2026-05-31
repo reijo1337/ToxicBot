@@ -1,0 +1,24 @@
+name: Deploy tracing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-tracing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Deploy Jaeger
+        uses: dawidd6/action-ansible-playbook@v2
+        env:
+          JAEGER_USERNAME: ${{ secrets.JAEGER_USERNAME }}
+          JAEGER_PASSWORD_HASH: ${{ secrets.JAEGER_PASSWORD_HASH }}
+        with:
+          playbook: deploy-tracing.yaml
+          directory: deploy/
+          key: ${{ secrets.SSH_MAMA_KEY }}
+          inventory: |
+            [vscale_host]
+            vscale ansible_host=${{ vars.VDS_HOST }} ansible_user=root

@@ -18,6 +18,7 @@ type imageDescriber interface {
 
 type messageGenerator interface {
 	GetMessageTextWithHistoryAndSteering(
+		ctx context.Context,
 		history []chathistory.Entry,
 		aiChance float32,
 		forceAI bool,

@@ -64,7 +64,7 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 		},
 	}
 
-	res := g.GetMessageTextWithHistory(history, 1.0, false)
+	res := g.GetMessageTextWithHistory(context.Background(), history, 1.0, false)
 
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "ответ", res.Message)
@@ -101,7 +101,7 @@ func TestGenerator_GetMessageText_StripsOutputMsgEnvelope(t *testing.T) {
 		systemPrompt:      "SYS",
 	}
 
-	res := g.GetMessageText("привет", 1.0)
+	res := g.GetMessageText(context.Background(), "привет", 1.0)
 
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "плохой текст", res.Message,
@@ -128,7 +128,7 @@ func TestGenerator_WithHistory_StripsOutputMsgEnvelope(t *testing.T) {
 	}
 
 	history := []chathistory.Entry{{ID: 1, Author: "@alice", Text: "нечто"}}
-	res := g.GetMessageTextWithHistory(history, 0.0, true)
+	res := g.GetMessageTextWithHistory(context.Background(), history, 0.0, true)
 
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "плохой текст", res.Message,
@@ -155,7 +155,7 @@ func TestGenerator_WithHistory_FallbackOnAiChanceMiss(t *testing.T) {
 	}
 
 	history := []chathistory.Entry{{ID: 1, Author: "@alice", Text: "йо"}}
-	res := g.GetMessageTextWithHistory(history, 0.5, false)
+	res := g.GetMessageTextWithHistory(context.Background(), history, 0.5, false)
 
 	assert.Equal(t, ByListGenerationStrategy, res.Strategy)
 	assert.Equal(t, "ха-ха", res.Message)
@@ -178,7 +178,7 @@ func TestGenerator_WithHistory_ForceAI_BypassesFilterAndProbability(t *testing.T
 	}
 
 	history := []chathistory.Entry{{ID: 1, Author: "@alice", Text: "нечто"}}
-	res := g.GetMessageTextWithHistory(history, 0.0, true)
+	res := g.GetMessageTextWithHistory(context.Background(), history, 0.0, true)
 
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "ок", res.Message)
@@ -202,7 +202,7 @@ func TestGenerator_WithHistory_EmptyHistory_FallsBackToList(t *testing.T) {
 		systemPrompt:      "SYS",
 	}
 
-	res := g.GetMessageTextWithHistory(nil, 1.0, false)
+	res := g.GetMessageTextWithHistory(context.Background(), nil, 1.0, false)
 	assert.Equal(t, ByListGenerationStrategy, res.Strategy)
 	assert.Equal(t, "fallback", res.Message)
 }
@@ -371,7 +371,7 @@ func TestGenerator_GetMessageText_AiReturnsTruncatedError_FallsBackToList(t *tes
 		systemPrompt:      "SYS",
 	}
 
-	res := g.GetMessageText("привет", 1.0)
+	res := g.GetMessageText(context.Background(), "привет", 1.0)
 
 	assert.Equal(t, ByListGenerationStrategy, res.Strategy)
 	assert.Equal(t, "list-b", res.Message)
@@ -402,7 +402,7 @@ func TestGenerator_WithHistory_AiReturnsTruncatedError_FallsBackToList(t *testin
 	}
 
 	history := []chathistory.Entry{{ID: 1, Author: "@alice", Text: "нечто"}}
-	res := g.GetMessageTextWithHistory(history, 0.0, true)
+	res := g.GetMessageTextWithHistory(context.Background(), history, 0.0, true)
 
 	assert.Equal(t, ByListGenerationStrategy, res.Strategy)
 	assert.Equal(t, "fallback-line", res.Message)
@@ -430,7 +430,7 @@ func TestGenerator_GetMessageText_TrimsToThreeSentencesMax(t *testing.T) {
 		systemPrompt:      "SYS",
 	}
 
-	res := g.GetMessageText("привет", 1.0)
+	res := g.GetMessageText(context.Background(), "привет", 1.0)
 
 	assert.Equal(t, AiGenerationStrategy, res.Strategy)
 	assert.Equal(t, "Один. Два. Три.", res.Message)
@@ -465,6 +465,7 @@ func TestGenerator_WithHistoryAndSteering_AppendsToSystem(t *testing.T) {
 	g := newCapturingGenerator(t, &captured)
 
 	res := g.GetMessageTextWithHistoryAndSteering(
+		context.Background(),
 		steeringTestHistory(),
 		1.0,
 		true,
@@ -484,7 +485,7 @@ func TestGenerator_WithHistory_EmptySteering_SystemUnchanged(t *testing.T) {
 	var captured []LLMMessage
 	g := newCapturingGenerator(t, &captured)
 
-	g.GetMessageTextWithHistory(steeringTestHistory(), 1.0, true)
+	g.GetMessageTextWithHistory(context.Background(), steeringTestHistory(), 1.0, true)
 
 	require.NotEmpty(t, captured)
 	assert.Equal(t, "SYS", captured[0].Content, "при пустом steering системный промпт не меняется")

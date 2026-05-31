@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type GenerationStrategy uint8
@@ -21,6 +23,14 @@ const (
 type GenerationResult struct {
 	Message  string
 	Strategy GenerationStrategy
+}
+
+// StrategyName renders the generation strategy for telemetry: "ai" or "list".
+func StrategyName(s GenerationStrategy) string {
+	if s == AiGenerationStrategy {
+		return "ai"
+	}
+	return "list"
 }
 
 // Hard caps mirror the "1-3 sentences, ≤300 chars" rule baked into systemPromptBase.
@@ -147,28 +157,22 @@ func (g *Generator) reloadMessages() error {
 	return nil
 }
 
-func (g *Generator) GetMessageText(replyTo string, aiChance float32) GenerationResult {
-	text, err := g.generateAi(replyTo, aiChance)
+func (g *Generator) GetMessageText(
+	ctx context.Context,
+	replyTo string,
+	aiChance float32,
+) GenerationResult {
+	text, err := g.generateAi(ctx, replyTo, aiChance)
 	if err == nil {
-		return GenerationResult{
-			Message:  text,
-			Strategy: AiGenerationStrategy,
-		}
+		return GenerationResult{Message: text, Strategy: AiGenerationStrategy}
 	} else if !errors.Is(err, errGenerationUnavailable) {
-		g.logger.Warn(
-			g.logger.WithError(context.Background(), err),
-			"generate ai response error",
-		)
+		g.logger.Warn(g.logger.WithError(ctx, err), "generate ai response error")
 	}
 
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	randomIndex := g.r.Intn(len(g.messages))
-	text = g.messages[randomIndex]
-	return GenerationResult{
-		Message:  text,
-		Strategy: ByListGenerationStrategy,
-	}
+	return GenerationResult{Message: g.messages[randomIndex], Strategy: ByListGenerationStrategy}
 }
 
 // GetMessageTextWithHistory generates a reply using the chat history.
@@ -176,11 +180,12 @@ func (g *Generator) GetMessageText(replyTo string, aiChance float32) GenerationR
 // are expected to append the current incoming message to the buffer before
 // calling this method.
 func (g *Generator) GetMessageTextWithHistory(
+	ctx context.Context,
 	history []chathistory.Entry,
 	aiChance float32,
 	forceAI bool,
 ) GenerationResult {
-	return g.GetMessageTextWithHistoryAndSteering(history, aiChance, forceAI, "")
+	return g.GetMessageTextWithHistoryAndSteering(ctx, history, aiChance, forceAI, "")
 }
 
 // GetMessageTextWithHistoryAndSteering works like GetMessageTextWithHistory but
@@ -188,35 +193,27 @@ func (g *Generator) GetMessageTextWithHistory(
 // this single AI call. Used by the photo handler to break the repeated photo
 // template; empty steering reproduces the plain behaviour.
 func (g *Generator) GetMessageTextWithHistoryAndSteering(
+	ctx context.Context,
 	history []chathistory.Entry,
 	aiChance float32,
 	forceAI bool,
 	steering string,
 ) GenerationResult {
-	text, err := g.generateAiWithHistory(history, aiChance, forceAI, steering)
+	text, err := g.generateAiWithHistory(ctx, history, aiChance, forceAI, steering)
 	if err == nil {
-		return GenerationResult{
-			Message:  text,
-			Strategy: AiGenerationStrategy,
-		}
+		return GenerationResult{Message: text, Strategy: AiGenerationStrategy}
 	} else if !errors.Is(err, errGenerationUnavailable) {
-		g.logger.Warn(
-			g.logger.WithError(context.Background(), err),
-			"generate ai with history response error",
-		)
+		g.logger.Warn(g.logger.WithError(ctx, err), "generate ai with history response error")
 	}
 
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	randomIndex := g.r.Intn(len(g.messages))
-	text = g.messages[randomIndex]
-	return GenerationResult{
-		Message:  text,
-		Strategy: ByListGenerationStrategy,
-	}
+	return GenerationResult{Message: g.messages[randomIndex], Strategy: ByListGenerationStrategy}
 }
 
 func (g *Generator) generateAiWithHistory(
+	ctx context.Context,
 	history []chathistory.Entry,
 	aiChance float32,
 	forceAI bool,
@@ -226,61 +223,113 @@ func (g *Generator) generateAiWithHistory(
 		return "", errGenerationUnavailable
 	}
 
+	_, decisionSpan := tracing.Tracer().Start(ctx, "decision")
 	if !forceAI {
-		if g.r.Float32() >= aiChance {
+		roll := g.r.Float32()
+		decisionSpan.SetAttributes(
+			attribute.Float64("ai_chance", float64(aiChance)),
+			attribute.Float64("roll", float64(roll)),
+		)
+		if roll >= aiChance {
+			decisionSpan.SetAttributes(
+				attribute.String("outcome", "skip"),
+				attribute.String("reason", "ai_chance"),
+			)
+			decisionSpan.End()
 			return "", errGenerationUnavailable
 		}
-
 		trigger := history[len(history)-1]
-		if !g.meaningfullFilter.IsMeaningfulPhrase(trigger.Text) {
+		meaningful := g.meaningfullFilter.IsMeaningfulPhrase(trigger.Text)
+		decisionSpan.SetAttributes(attribute.Bool("meaningful", meaningful))
+		if !meaningful {
+			decisionSpan.SetAttributes(
+				attribute.String("outcome", "skip"),
+				attribute.String("reason", "not_meaningful"),
+			)
+			decisionSpan.End()
 			return "", errGenerationUnavailable
 		}
+	} else {
+		decisionSpan.SetAttributes(attribute.Bool("force_ai", true))
 	}
+	decisionSpan.SetAttributes(attribute.String("outcome", "ai"))
+	decisionSpan.End()
 
 	g.mu.RLock()
 	system := g.systemPrompt
 	g.mu.RUnlock()
 
 	if steering != "" {
-		// Пустая строка отделяет базовый промпт от call-scoped подсказки —
-		// модель читает их как два самостоятельных блока инструкций.
 		system = system + "\n\n" + steering
 	}
 
 	msgs := buildChatCompletions(system, history)
-	out, err := g.ai.Chat(context.Background(), msgs...)
+	out, err := g.ai.Chat(ctx, msgs...)
 	if err != nil {
 		return "", err
 	}
-	return TrimToSentences(StripOutputMsgEnvelope(out), maxResponseSentences, maxResponseRunes), nil
+
+	return g.sanitizeWithSpan(ctx, out), nil
 }
 
-func (g *Generator) generateAi(replyTo string, aiChance float32) (string, error) {
-	if g.r.Float32() >= aiChance {
+func (g *Generator) generateAi(
+	ctx context.Context,
+	replyTo string,
+	aiChance float32,
+) (string, error) {
+	_, decisionSpan := tracing.Tracer().Start(ctx, "decision")
+	roll := g.r.Float32()
+	decisionSpan.SetAttributes(
+		attribute.Float64("ai_chance", float64(aiChance)),
+		attribute.Float64("roll", float64(roll)),
+	)
+	if roll >= aiChance {
+		decisionSpan.SetAttributes(
+			attribute.String("outcome", "skip"),
+			attribute.String("reason", "ai_chance"),
+		)
+		decisionSpan.End()
 		return "", errGenerationUnavailable
 	}
-
-	if !g.meaningfullFilter.IsMeaningfulPhrase(replyTo) {
+	meaningful := g.meaningfullFilter.IsMeaningfulPhrase(replyTo)
+	decisionSpan.SetAttributes(attribute.Bool("meaningful", meaningful))
+	if !meaningful {
+		decisionSpan.SetAttributes(
+			attribute.String("outcome", "skip"),
+			attribute.String("reason", "not_meaningful"),
+		)
+		decisionSpan.End()
 		return "", errGenerationUnavailable
 	}
+	decisionSpan.SetAttributes(attribute.String("outcome", "ai"))
+	decisionSpan.End()
 
 	g.mu.RLock()
 	system := g.systemPrompt
 	g.mu.RUnlock()
 
-	out, err := g.ai.Chat(
-		context.Background(),
-		LLMMessage{
-			Role:    RoleSystem,
-			Content: system,
-		},
-		LLMMessage{
-			Role:    RoleUser,
-			Content: replyTo,
-		},
+	out, err := g.ai.Chat(ctx,
+		LLMMessage{Role: RoleSystem, Content: system},
+		LLMMessage{Role: RoleUser, Content: replyTo},
 	)
 	if err != nil {
 		return "", err
 	}
-	return TrimToSentences(StripOutputMsgEnvelope(out), maxResponseSentences, maxResponseRunes), nil
+
+	return g.sanitizeWithSpan(ctx, out), nil
+}
+
+// sanitizeWithSpan post-processes raw LLM output (strip the <msg> envelope, trim
+// to the sentence/rune caps) under a "sanitize" span recording raw vs final.
+func (g *Generator) sanitizeWithSpan(ctx context.Context, out string) string {
+	_, span := tracing.Tracer().Start(ctx, "sanitize")
+	defer span.End()
+	final := TrimToSentences(StripOutputMsgEnvelope(out), maxResponseSentences, maxResponseRunes)
+	if span.IsRecording() {
+		span.SetAttributes(
+			tracing.ContentAttr("raw", out),
+			tracing.ContentAttr("final", final),
+		)
+	}
+	return final
 }
