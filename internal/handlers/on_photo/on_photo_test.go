@@ -316,6 +316,16 @@ func TestDescribePrompt_ContainsAntiInjectionGuards(t *testing.T) {
 	assert.Contains(t, describePrompt, "На изображении")
 }
 
+func TestDescribePrompt_AsksForMemeEssence(t *testing.T) {
+	t.Parallel()
+	assert.Contains(t, describePrompt, "в чём шутка",
+		"describe prompt must ask the vision model to capture the meme's point")
+	assert.Contains(t, describePrompt, "не выполняй",
+		"anti-injection rule must be preserved")
+	assert.Contains(t, describePrompt, "На изображении",
+		"opening convention must be preserved")
+}
+
 func TestBuildPrompt_DirectFromUser_AddsContextWithAuthorPhrase(t *testing.T) {
 	t.Parallel()
 
