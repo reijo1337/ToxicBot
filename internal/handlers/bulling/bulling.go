@@ -14,6 +14,8 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
 
@@ -71,6 +73,9 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		return nil
 	}
 
+	spanCtx, span := tracing.StartHandlerSpan(ctx, b.Slug())
+	defer span.End()
+
 	author := message.SanitizeAuthor(user.Username, user.FirstName, user.ID, user.IsBot)
 
 	msg := ctx.Message()
@@ -106,6 +111,11 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 
 	if !isReplyOrMention {
 		if isCooldown || !isMsgThreshold {
+			span.SetAttributes(
+				attribute.String("outcome", "skip"),
+				attribute.Bool("cooldown", isCooldown),
+				attribute.Bool("threshold_met", isMsgThreshold),
+			)
 			// Non-triggering path: record the message for future context.
 			b.history.Add(chat.ID, userEntry)
 			return nil
@@ -114,13 +124,21 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 
 	b.setCooldown(key, settings.Cooldown)
 
+	trigger := "threshold"
+	if isReplyOrMention {
+		trigger = "reply_or_mention"
+	}
+	span.SetAttributes(attribute.String("outcome", "react"), attribute.String("trigger", trigger))
+
 	history := b.history.Get(chat.ID)
 	history = append(history, userEntry)
 	result := b.generator.GetMessageTextWithHistory(
+		spanCtx,
 		history,
 		settings.AIChance,
 		false,
 	)
+	span.SetAttributes(attribute.String("strategy", message.StrategyName(result.Strategy)))
 
 	go b.statIncer.Inc(
 		b.ctx,
@@ -142,6 +160,7 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		b.history.Add(chat.ID, userEntry)
 		return err
 	}
+	span.SetAttributes(attribute.Int("telegram.sent_message_id", sent.ID))
 
 	botEntry := chathistory.Entry{
 		ID:        sent.ID,

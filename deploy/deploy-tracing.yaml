@@ -1,0 +1,75 @@
+---
+
+- name: Deploy tracing (Jaeger)
+
+  become: yes
+  hosts: vscale_host
+
+  vars:
+    jaeger_data_dir: /srv/ToxicBot/jaeger
+    caddy_dir: /srv/ToxicBot/jaeger-caddy
+    jaeger_username: "{{ lookup('env', 'JAEGER_USERNAME') }}"
+    jaeger_password_hash: "{{ lookup('env', 'JAEGER_PASSWORD_HASH') }}"
+
+  tasks:
+    - name: Create Jaeger data directory
+      ansible.builtin.file:
+        path: "{{ jaeger_data_dir }}"
+        state: directory
+        mode: '0750'
+
+    - name: Create Caddy config directory
+      ansible.builtin.file:
+        path: "{{ caddy_dir }}"
+        state: directory
+        mode: '0750'
+
+    - name: Create tracing network
+      community.docker.docker_network:
+        name: toxicbot-tracing
+        state: present
+
+    - name: Create and start Jaeger container
+      community.docker.docker_container:
+        name: "ToxicBot-Jaeger"
+        image: "jaegertracing/all-in-one:1.57"
+        state: started
+        restart_policy: always
+        networks:
+          - name: toxicbot-tracing
+            aliases:
+              - jaeger
+        volumes:
+          - "{{ jaeger_data_dir }}:/badger"
+        env:
+          COLLECTOR_OTLP_ENABLED: "true"
+          SPAN_STORAGE_TYPE: "badger"
+          BADGER_EPHEMERAL: "false"
+          BADGER_SPAN_STORE_TTL: "168h"
+
+    - name: Write Caddyfile
+      ansible.builtin.copy:
+        dest: "{{ caddy_dir }}/Caddyfile"
+        mode: '0640'
+        content: |
+          :16686 {
+              basic_auth {
+                  {{ jaeger_username }} {{ jaeger_password_hash }}
+              }
+              reverse_proxy jaeger:16686
+          }
+
+    - name: Create and start Caddy (Jaeger UI auth proxy)
+      community.docker.docker_container:
+        name: "ToxicBot-Jaeger-Caddy"
+        image: "caddy:2.10.2"
+        state: started
+        recreate: yes
+        restart_policy: always
+        networks:
+          - name: toxicbot-tracing
+        ports:
+          - "16686:16686"
+        volumes:
+          - "{{ caddy_dir }}/Caddyfile:/etc/caddy/Caddyfile:ro"
+          - "{{ caddy_dir }}/data:/data"

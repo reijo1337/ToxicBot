@@ -11,6 +11,11 @@
         path: /srv/ToxicBot/db
         state: directory
 
+    - name: Create tracing network
+      community.docker.docker_network:
+        name: toxicbot-tracing
+        state: present
+
     - name: Create and start a container
       community.docker.docker_container:
         name: "ToxicBot"
@@ -19,6 +24,8 @@
         state: started
         recreate: yes
         restart_policy: always
+        networks:
+          - name: toxicbot-tracing
         volumes:
           - "/srv/ToxicBot/db:/toxicdb"
         env:
@@ -34,6 +41,8 @@
           BULLINGS_THRESHOLD_COUNT: "2"
           BULLINGS_THRESHOLD_TIME: "5m"
           SQLITE_FILE_PATH: "/toxicdb/sas_sqlite.db"
+          TRACING_ENABLED: "{{ TRACING_ENABLED }}"
+          TRACING_OTLP_ENDPOINT: "jaeger:4317"
 
     - name: Prune unused imagages
       community.docker.docker_prune:

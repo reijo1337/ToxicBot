@@ -11,6 +11,8 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
 
@@ -79,6 +81,9 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	sender := pointer.From(ctx.Sender())
 	msg := ctx.Message()
 
+	_, span := tracing.StartHandlerSpan(ctx, h.Slug())
+	defer span.End()
+
 	author := message.SanitizeAuthor(sender.Username, sender.FirstName, sender.ID, sender.IsBot)
 	replyToID := 0
 	if msg.ReplyTo != nil {
@@ -99,8 +104,11 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	}
 
 	if h.r.Float32() > settings.VoiceReactChance {
+		span.SetAttributes(attribute.String("outcome", "skip"))
 		return nil
 	}
+
+	span.SetAttributes(attribute.String("outcome", "react"))
 
 	h.muVcs.RLock()
 	defer h.muVcs.RUnlock()

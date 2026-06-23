@@ -4,6 +4,7 @@ package tagger
 import (
 	"context"
 
+	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 )
@@ -13,7 +14,7 @@ type nicknameRepository interface {
 }
 
 type messageGenerator interface {
-	GetMessageText(prompt string, aiChance float32) message.GenerationResult
+	GetMessageText(ctx context.Context, prompt string, aiChance float32) message.GenerationResult
 }
 
 type logger interface {
@@ -29,4 +30,8 @@ type randomizer interface {
 
 type statIncer interface {
 	Inc(ctx context.Context, chatID, userID int64, op stats.OperationType, opts ...stats.Option)
+}
+
+type settingsProvider interface {
+	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
 }

@@ -14,6 +14,10 @@ import (
 	"net/textproto"
 	"sync"
 	"time"
+
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -97,7 +101,23 @@ func (c *Client) GenerateContent(
 	prompt string,
 	imageBytes []byte,
 ) (string, error) {
-	return c.generateContentWithBaseURL(ctx, prompt, imageBytes, c.baseURL)
+	ctx, span := tracing.Tracer().Start(ctx, "gen_ai gigachat")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("gen_ai.system", "gigachat"),
+		attribute.String("gen_ai.request.model", c.cfg.Model),
+		attribute.Int("gen_ai.input.image_bytes", len(imageBytes)),
+		tracing.ContentAttr("gen_ai.input", prompt),
+	)
+
+	out, err := c.generateContentWithBaseURL(ctx, prompt, imageBytes, c.baseURL)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "gigachat request failed")
+		return "", err
+	}
+	span.SetAttributes(tracing.ContentAttr("gen_ai.output", out))
+	return out, nil
 }
 
 func (c *Client) generateContentWithBaseURL(

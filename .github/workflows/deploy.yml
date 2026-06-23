@@ -32,6 +32,7 @@ jobs:
           GOOGLE_SPREADSHEET_ID=${{ secrets.GOOGLE_SPREADSHEET_ID }}
           DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
           GIGACHAT_AUTH_KEY=${{ secrets.GIGACHAT_AUTH_KEY }}
+          TRACING_ENABLED=${{ vars.TRACING_ENABLED != '' && vars.TRACING_ENABLED || 'true' }}
           DOCKER_TAG=${{ inputs.docker_tag }}"
           -vvvv
 

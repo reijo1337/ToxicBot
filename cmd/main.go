@@ -35,6 +35,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/storage/db"
 	"github.com/reijo1337/ToxicBot/pkg/logger"
 	"github.com/reijo1337/ToxicBot/pkg/migrator"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
 	"gopkg.in/telebot.v3"
 )
 
@@ -62,6 +63,23 @@ func main() {
 			"can't init config",
 		)
 	}
+
+	tracingCfg, err := tracing.ParseConfig()
+	if err != nil {
+		logger.Fatal(logger.WithError(ctx, err), "can't parse tracing config")
+	}
+
+	tracingProvider, err := tracing.Setup(ctx, tracingCfg)
+	if err != nil {
+		logger.Fatal(logger.WithError(ctx, err), "can't init tracing")
+	}
+	defer func() {
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelShutdown()
+		if err := tracingProvider.Shutdown(shutdownCtx); err != nil {
+			logger.Warn(logger.WithError(shutdownCtx, err), "tracing shutdown error")
+		}
+	}()
 
 	if err := migrator.MigrateDB(cfg.SqliteFilePath); err != nil {
 		logger.Fatal(logger.WithError(ctx, err), "failed to migrate db")

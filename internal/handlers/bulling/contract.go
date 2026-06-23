@@ -12,6 +12,7 @@ import (
 
 type messageGenerator interface {
 	GetMessageTextWithHistory(
+		ctx context.Context,
 		history []chathistory.Entry,
 		aiChance float32,
 		forceAI bool,

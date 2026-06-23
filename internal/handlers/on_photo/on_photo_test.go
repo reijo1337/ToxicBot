@@ -16,6 +16,10 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.uber.org/mock/gomock"
 	"gopkg.in/telebot.v3"
 )
@@ -42,6 +46,8 @@ func (c *fakeContext) Message() *telebot.Message { return c.msg }
 func (*fakeContext) Notify(telebot.ChatAction) error {
 	return nil
 }
+func (c *fakeContext) Set(string, interface{}) {}
+func (c *fakeContext) Get(string) interface{}  { return nil }
 
 type testEnv struct {
 	ctrl       *gomock.Controller
@@ -148,8 +154,8 @@ func TestHandle_HappyPath_WritesPairViaAddAll(t *testing.T) {
 			{ID: 1, Author: "@bob", Text: "past"},
 		}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
-			DoAndReturn(func(h []chathistory.Entry, _ float32, _ bool, steering string) message.GenerationResult {
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
+			DoAndReturn(func(_ context.Context, h []chathistory.Entry, _ float32, _ bool, steering string) message.GenerationResult {
 				capturedHistory = h
 				capturedSteering = steering
 				return message.GenerationResult{
@@ -269,7 +275,7 @@ func TestHandle_ReplierError_NoAddAll(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "бля", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "бля").Return(nil, errors.New("telegram down")),
 	)
@@ -293,7 +299,7 @@ func TestHandle_AlbumDedup_SkipsSecondPhotoInSameAlbum(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(first, "ok").Return(&telebot.Message{ID: 60}, nil),
 		env.history.EXPECT().AddAll(testChatID, gomock.Any(), gomock.Any()),
@@ -632,7 +638,7 @@ func TestHandle_LongDescriptionTruncatedAndWrapped(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -666,7 +672,7 @@ func TestHandle_DescriptionWithClosingTagSanitized(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -737,7 +743,7 @@ func TestHandle_ForwardedFromChannel_HistoryEntryMentionsChannelInContext(t *tes
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -768,7 +774,7 @@ func TestHandle_ForwardedFromUser_HistoryEntryMentionsOriginalSender(t *testing.
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -799,7 +805,7 @@ func TestHandle_UsesFirstNameWhenUsernameEmpty(t *testing.T) {
 	gomock.InOrder(
 		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
 			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
 		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
 		env.history.EXPECT().
@@ -829,8 +835,8 @@ func TestHandle_FiltersBotEntriesFromLLMHistory(t *testing.T) {
 			{ID: 3, Author: "@carol", Text: "u2", FromBot: false},
 		}),
 		env.generator.EXPECT().
-			GetMessageTextWithHistoryAndSteering(gomock.Any(), float32(1.0), true, gomock.Any()).
-			DoAndReturn(func(h []chathistory.Entry, _ float32, _ bool, _ string) message.GenerationResult {
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
+			DoAndReturn(func(_ context.Context, h []chathistory.Entry, _ float32, _ bool, _ string) message.GenerationResult {
 				capturedHistory = h
 				return message.GenerationResult{
 					Message:  "отвали",
@@ -913,4 +919,41 @@ func TestDropBotEntries_EmptyAndEdgeCases(t *testing.T) {
 		{ID: 2, Text: "u2", FromBot: false},
 	}
 	require.Len(t, dropBotEntries(allUser), 2)
+}
+
+//nolint:paralleltest // sets global OTel tracer provider / mutates package state; must run serially
+func TestHandle_EmitsOnPhotoSpanWithSteering(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))
+
+	env := newTestEnv(t)
+	env.setupPhotoPipeline("кот")
+	msg := photoMessage(50, "", replyToBotMessage())
+	ctx := newCtx(msg, goodSender())
+	gomock.InOrder(
+		env.history.EXPECT().Get(testChatID).Return([]chathistory.Entry{}),
+		env.generator.EXPECT().
+			GetMessageTextWithHistoryAndSteering(gomock.Any(), gomock.Any(), float32(1.0), true, gomock.Any()).
+			Return(message.GenerationResult{Message: "ok", Strategy: message.AiGenerationStrategy}),
+		env.replier.EXPECT().Reply(msg, "ok").Return(&telebot.Message{ID: 51}, nil),
+		env.history.EXPECT().AddAll(testChatID, gomock.Any(), gomock.Any()),
+	)
+	require.NoError(t, env.handler.Handle(ctx))
+
+	var found bool
+	for _, s := range sr.Ended() {
+		if s.Name() == "on_photo" {
+			found = true
+			attrs := map[string]string{}
+			for _, kv := range s.Attributes() {
+				if kv.Value.Type() == attribute.STRING {
+					attrs[string(kv.Key)] = kv.Value.AsString()
+				}
+			}
+			assert.Equal(t, "react", attrs["outcome"])
+			assert.Equal(t, "ai", attrs["strategy"])
+			assert.NotEmpty(t, attrs["steering"])
+		}
+	}
+	assert.True(t, found, "on_photo span must be emitted")
 }

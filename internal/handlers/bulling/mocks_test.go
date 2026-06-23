@@ -45,17 +45,17 @@ func (m *MockmessageGenerator) EXPECT() *MockmessageGeneratorMockRecorder {
 }
 
 // GetMessageTextWithHistory mocks base method.
-func (m *MockmessageGenerator) GetMessageTextWithHistory(history []chathistory.Entry, aiChance float32, forceAI bool) message.GenerationResult {
+func (m *MockmessageGenerator) GetMessageTextWithHistory(ctx context.Context, history []chathistory.Entry, aiChance float32, forceAI bool) message.GenerationResult {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMessageTextWithHistory", history, aiChance, forceAI)
+	ret := m.ctrl.Call(m, "GetMessageTextWithHistory", ctx, history, aiChance, forceAI)
 	ret0, _ := ret[0].(message.GenerationResult)
 	return ret0
 }
 
 // GetMessageTextWithHistory indicates an expected call of GetMessageTextWithHistory.
-func (mr *MockmessageGeneratorMockRecorder) GetMessageTextWithHistory(history, aiChance, forceAI any) *gomock.Call {
+func (mr *MockmessageGeneratorMockRecorder) GetMessageTextWithHistory(ctx, history, aiChance, forceAI any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextWithHistory", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextWithHistory), history, aiChance, forceAI)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextWithHistory", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextWithHistory), ctx, history, aiChance, forceAI)
 }
 
 // MockstatIncer is a mock of statIncer interface.

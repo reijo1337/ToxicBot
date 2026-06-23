@@ -8,14 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
-
-type settingsProvider interface {
-	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
-}
 
 const prompt = "Придумай внезапное оскорбление для участника чата"
 
@@ -151,20 +148,7 @@ func (h *Handler) sender(ctx context.Context) {
 		user := users[index]
 
 		chatIDint, _ := strconv.ParseInt(task.chatID, 10, 64)
-
-		var aiChance float32
-		if s, err := h.settingsProvider.GetForChat(h.ctx, chatIDint); err == nil {
-			aiChance = s.AIChance
-		}
-
-		genResult := h.generator.GetMessageText(prompt, aiChance)
-
-		text := fmt.Sprintf(
-			"[%s](tg://user?id=%d), %s",
-			nickname,
-			user,
-			genResult.Message,
-		)
+		text := h.buildTag(chatIDint, user, nickname)
 		h.mu.Unlock()
 
 		go h.statIncer.Inc(h.ctx, chatIDint, user, stats.PersonalOperationType)
@@ -190,6 +174,29 @@ func (h *Handler) sender(ctx context.Context) {
 			},
 		)
 	}
+}
+
+// buildTag generates the insult text for a scheduled tag and owns the
+// timer-driven root span (there is no incoming update / telebot.Context here).
+func (h *Handler) buildTag(chatID, user int64, nickname string) string {
+	ctx, span := tracing.Tracer().Start(context.Background(), "tagger")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("trigger", "timer"),
+		attribute.Int64("chat.id", chatID),
+		attribute.Int64("user.id", user),
+		attribute.String("nickname", nickname),
+	)
+
+	var aiChance float32
+	if s, err := h.settingsProvider.GetForChat(ctx, chatID); err == nil {
+		aiChance = s.AIChance
+	}
+
+	genResult := h.generator.GetMessageText(ctx, prompt, aiChance)
+	span.SetAttributes(tracing.ContentAttr("output", genResult.Message))
+
+	return fmt.Sprintf("[%s](tg://user?id=%d), %s", nickname, user, genResult.Message)
 }
 
 func (h *Handler) updateNicknames() error {

@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
+	"github.com/reijo1337/ToxicBot/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // ErrResponseTruncated is returned when DeepSeek signals that the reply
@@ -62,6 +66,18 @@ func (c *Client) Chat(
 		return "", errors.New("no messages provided")
 	}
 
+	ctx, span := tracing.Tracer().Start(ctx, "gen_ai deepseek")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("gen_ai.system", "deepseek"),
+		attribute.String("gen_ai.request.model", c.model),
+	)
+	// renderMessages joins the whole envelope (system + up to 100 history msgs);
+	// skip that build when the span won't store it (tracing off / not sampled).
+	if span.IsRecording() {
+		span.SetAttributes(tracing.ContentAttr("gen_ai.input", renderMessages(msgs)))
+	}
+
 	resp, err := c.sdk.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model:       c.model,
 		Messages:    toSDKMessages(msgs),
@@ -79,17 +95,29 @@ func (c *Client) Chat(
 		option.WithJSONSet("thinking", map[string]string{"type": "disabled"}),
 	)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "deepseek request failed")
 		return "", fmt.Errorf("deepseek chat: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		return "", errors.New("no choices in response")
+		err := errors.New("no choices in response")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "no choices")
+		return "", err
 	}
-	switch resp.Choices[0].FinishReason {
+
+	choice := resp.Choices[0]
+	span.SetAttributes(attribute.String("gen_ai.finish_reason", choice.FinishReason))
+
+	switch choice.FinishReason {
 	case "", "stop", "tool_calls":
 		// Normal successful completions: empty (legacy DeepSeek responses
 		// occasionally omit the field), "stop" (model finished naturally),
 		// "tool_calls" (function-calling handoff — content is fine).
-		return resp.Choices[0].Message.Content, nil
+		if span.IsRecording() {
+			span.SetAttributes(tracing.ContentAttr("gen_ai.output", choice.Message.Content))
+		}
+		return choice.Message.Content, nil
 	default:
 		// "length" — model hit max_tokens, content ends mid-thought / mid-word.
 		// "content_filter" — safety filter wiped the body, content is empty
@@ -104,8 +132,7 @@ func (c *Client) Chat(
 		// high completion/reasoning tokens (model rambled past the cap) vs
 		// "content_filter" with a near-empty body (safety layer wiped it) vs an
 		// unexpected reason. errors.Is(ErrResponseTruncated) still holds via %w.
-		choice := resp.Choices[0]
-		return "", fmt.Errorf(
+		err := fmt.Errorf(
 			"finish_reason=%q completion_tokens=%d reasoning_tokens=%d content_len=%d: %w",
 			choice.FinishReason,
 			resp.Usage.CompletionTokens,
@@ -113,7 +140,29 @@ func (c *Client) Chat(
 			len(choice.Message.Content),
 			ErrResponseTruncated,
 		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "response unusable")
+		return "", err
 	}
+}
+
+// renderMessages flattens the chat envelope into one string for the gen_ai.input
+// span attribute: one "role[ name]: content" line per message.
+func renderMessages(msgs []message.LLMMessage) string {
+	var b strings.Builder
+	for i, m := range msgs {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(string(m.Role))
+		if m.Name != "" {
+			b.WriteString(" ")
+			b.WriteString(m.Name)
+		}
+		b.WriteString(": ")
+		b.WriteString(m.Content)
+	}
+	return b.String()
 }
 
 func toSDKMessages(in []message.LLMMessage) []openai.ChatCompletionMessageParamUnion {
