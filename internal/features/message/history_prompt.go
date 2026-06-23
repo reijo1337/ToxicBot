@@ -12,19 +12,24 @@ const (
 	timeLayoutLLM = "2006-01-02T15:04"
 )
 
-// formatUserContent renders one user-authored history entry as
-// `<msg time="..." [reply_to="@..."]>текст</msg>`. Authorship travels in
-// LLMMessage.Name. The body is sanitized to defang any nested tag forging or
-// control characters unless the caller marked the entry as PreFormatted
-// (already-XML-formatted bodies produced by the photo handler).
+// formatUserContent рендерит одну user-запись из истории в виде
+// `<msg from="@..." time="..." [reply_to="@..."] [now="true"]>текст</msg>`.
+// Авторство теперь явно передаётся через атрибут from= внутри тела сообщения;
+// LLMMessage.Name при этом сохраняется. Тело санируется для защиты от подделки
+// тегов, если только запись не помечена как PreFormatted (уже-XML от photo-хендлера).
 //
-// NOTE: only user-entries are wrapped in `<msg>`. Bot-entries (FromBot=true)
-// are emitted as bare sanitized text by buildChatCompletions, so that the
-// model does not learn to mirror the envelope back into its own output.
-func formatUserContent(e chathistory.Entry, history []chathistory.Entry) string {
+// Параметр isTrigger=true добавляет атрибут now="true" — маркер единственной
+// реплики, на которую бот должен отвечать; все остальные записи — только контекст.
+//
+// NOTE: только user-записи оборачиваются в <msg>. Bot-записи (FromBot=true)
+// выдаются как bare sanitized text в buildChatCompletions, чтобы модель не
+// начала воспроизводить обёртку в своих ответах.
+func formatUserContent(e chathistory.Entry, history []chathistory.Entry, isTrigger bool) string {
 	var b strings.Builder
-	b.WriteString(`<msg time="`)
-	// timestamp is always emitted in UTC so the prompt is host-TZ-independent.
+	b.WriteString(`<msg from="`)
+	b.WriteString(sanitizeAttr(e.Author))
+	b.WriteString(`" time="`)
+	// timestamp всегда в UTC, чтобы промпт не зависел от TZ хоста.
 	b.WriteString(e.Time.UTC().Format(timeLayoutLLM))
 	b.WriteString(`"`)
 
@@ -37,6 +42,12 @@ func formatUserContent(e chathistory.Entry, history []chathistory.Entry) string 
 				break
 			}
 		}
+	}
+
+	// now="true" помечает единственную реплику, на которую бот должен отвечать;
+	// всё остальное — контекст.
+	if isTrigger {
+		b.WriteString(` now="true"`)
 	}
 
 	b.WriteString(`>`)
@@ -90,11 +101,20 @@ func buildChatCompletions(
 		return sorted[i].ID < sorted[j].ID
 	})
 
+	// Самая поздняя user-реплика — та, на которую бот отвечает; остальное контекст.
+	triggerIdx := -1
+	for i := len(sorted) - 1; i >= 0; i-- {
+		if !sorted[i].FromBot {
+			triggerIdx = i
+			break
+		}
+	}
+
 	msgs := make([]LLMMessage, 0, len(sorted)+1)
 	msgs = append(msgs, LLMMessage{Role: RoleSystem, Content: system})
 
 	skipping := true
-	for _, e := range sorted {
+	for i, e := range sorted {
 		if skipping && e.FromBot {
 			continue
 		}
@@ -112,7 +132,7 @@ func buildChatCompletions(
 		msgs = append(msgs, LLMMessage{
 			Role:    RoleUser,
 			Name:    e.Author,
-			Content: formatUserContent(e, sorted),
+			Content: formatUserContent(e, sorted, i == triggerIdx),
 		})
 	}
 

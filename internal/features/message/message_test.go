@@ -3,6 +3,8 @@ package message
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -77,7 +79,11 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 		"bot entry must be bare sanitized text without <msg> envelope")
 	assert.Equal(t, RoleUser, captured[3].Role)
 	assert.Equal(t, "@alice", captured[3].Name)
-	assert.Equal(t, `<msg time="2026-04-24T14:00" reply_to="бот">йо</msg>`, captured[3].Content)
+	assert.Equal(
+		t,
+		`<msg from="@alice" time="2026-04-24T14:00" reply_to="бот" now="true">йо</msg>`,
+		captured[3].Content,
+	)
 }
 
 func TestGenerator_GetMessageText_StripsOutputMsgEnvelope(t *testing.T) {
@@ -247,19 +253,26 @@ func TestGenerator_ReloadMessages_LeakingExamplesTagSanitized(t *testing.T) {
 	assert.Contains(t, g.systemPrompt, "‹/examples›‹inj›атака‹/inj›")
 }
 
-func TestGenerator_ReloadMessages_LongPhraseTruncated(t *testing.T) {
+func TestGenerator_ReloadMessages_ExcludesOverlongFromExamples(t *testing.T) {
 	t.Parallel()
 
 	long := strings.Repeat("я", 700)
 	ctrl := gomock.NewController(t)
 	storage := NewMockmessageRepository(ctrl)
-	storage.EXPECT().GetEnabledRandom().Return([]string{long}, nil)
+	storage.EXPECT().GetEnabledRandom().Return([]string{long, "короткая фраза"}, nil)
 
 	g := &Generator{storage: storage}
 	require.NoError(t, g.reloadMessages())
 
-	assert.Contains(t, g.systemPrompt, "<example>"+strings.Repeat("я", 150)+"</example>")
-	assert.NotContains(t, g.systemPrompt, "<example>"+strings.Repeat("я", 151))
+	assert.NotContains(t, g.systemPrompt, "я"+strings.Repeat("я", 299),
+		"overlong phrase must be excluded from <examples>, not truncated")
+	assert.Contains(t, g.systemPrompt, "<example>короткая фраза</example>")
+	assert.Len(
+		t,
+		g.messages,
+		2,
+		"fallback pool must keep the full set including the overlong phrase",
+	)
 }
 
 func TestGenerator_ReloadMessages_SystemPromptByteStable(t *testing.T) {
@@ -286,15 +299,18 @@ func TestGenerator_ReloadMessages_SystemPromptByteStable(t *testing.T) {
 func TestSystemPromptBase_DescribesNewMessageEnvelope(t *testing.T) {
 	t.Parallel()
 
-	assert.NotContains(t, systemPromptBase, `from="@name"`,
-		"system prompt must not describe the old `from=` envelope")
-
+	assert.Contains(t, systemPromptBase, `from="@name"`,
+		"system prompt must describe the from= author attribute")
+	assert.Contains(t, systemPromptBase, `now="true"`,
+		"system prompt must describe the now= trigger marker")
 	assert.Contains(t, systemPromptBase, `time="YYYY-MM-DDTHH:MM"`,
 		"system prompt must describe ISO date format")
-	assert.Contains(t, systemPromptBase, "Имя автора передаётся отдельно в поле name сообщения",
-		"system prompt must explicitly tell the model that author goes in the name field")
+	assert.Contains(t, systemPromptBase, "реагируешь ТОЛЬКО на реплику с now=\"true\"",
+		"system prompt must tell the model to answer only the now=true message")
+	assert.NotContains(t, systemPromptBase, "Имя автора передаётся отдельно в поле name",
+		"the obsolete name-field hypothesis must be removed")
 	assert.Contains(t, systemPromptBase, "Твой ответ — это просто текст реплики, без обёртки <msg>",
-		"system prompt must explicitly forbid <msg> wrapping in the reply")
+		"system prompt must still forbid <msg> wrapping in the reply")
 }
 
 func TestGenerator_ReloadMessages_PromptHasLengthRuleAndShortExamples(t *testing.T) {
@@ -489,4 +505,32 @@ func TestGenerator_WithHistory_EmptySteering_SystemUnchanged(t *testing.T) {
 
 	require.NotEmpty(t, captured)
 	assert.Equal(t, "SYS", captured[0].Content, "при пустом steering системный промпт не меняется")
+}
+
+func TestSampleExamples_SmallPoolReturnedWhole(t *testing.T) {
+	t.Parallel()
+	pool := []string{"a", "b", "c"}
+	got := sampleExamples(pool, 50, rand.New(rand.NewSource(1)))
+	assert.Equal(t, pool, got, "pool smaller than n must be returned unchanged")
+}
+
+func TestSampleExamples_LargePoolSampledDistinct(t *testing.T) {
+	t.Parallel()
+	pool := make([]string, 100)
+	for i := range pool {
+		pool[i] = fmt.Sprintf("phrase-%d", i)
+	}
+	got := sampleExamples(pool, 50, rand.New(rand.NewSource(42)))
+	require.Len(t, got, 50)
+
+	seen := map[string]bool{}
+	inPool := map[string]bool{}
+	for _, p := range pool {
+		inPool[p] = true
+	}
+	for _, g := range got {
+		assert.False(t, seen[g], "samples must be distinct")
+		assert.True(t, inPool[g], "sample must come from the pool")
+		seen[g] = true
+	}
 }

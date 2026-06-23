@@ -134,7 +134,7 @@ func main() {
 	}
 
 	chatHistory := chathistory.NewBuffer(
-		100,
+		50,
 		chathistory.WithStore(chatHistoryStorage),
 		chathistory.WithLogger(logger),
 	)
