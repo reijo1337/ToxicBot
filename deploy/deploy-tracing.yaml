@@ -17,6 +17,10 @@
         path: "{{ jaeger_data_dir }}"
         state: directory
         mode: '0750'
+        # образ jaeger all-in-one бежит под non-root UID 10001 — том должен принадлежать ему,
+        # иначе badger не может создать каталоги и контейнер падает в crash-loop
+        owner: "10001"
+        group: "10001"
 
     - name: Create Caddy config directory
       ansible.builtin.file:
@@ -46,6 +50,10 @@
           SPAN_STORAGE_TYPE: "badger"
           BADGER_EPHEMERAL: "false"
           BADGER_SPAN_STORE_TTL: "168h"
+          # без явных директорий badger пишет в /go/bin/data (WORKDIR образа, недоступен на запись)
+          # → crash-loop; направляем хранилище в смонтированный том /badger
+          BADGER_DIRECTORY_KEY: "/badger/keys"
+          BADGER_DIRECTORY_VALUE: "/badger/values"
 
     - name: Write Caddyfile
       ansible.builtin.copy:
