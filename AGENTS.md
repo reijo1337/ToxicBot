@@ -46,6 +46,8 @@ internal/
     storage/db/                          — storage layer (SQLite)
   usecase/                               — business logic
 pkg/                                     — shared utilities (logger, migrator, mapper)
+openspec/                                — living specs по capability + активные changes (см. SDD.md)
+tools/specctl/                           — гейт: связывает спеки с кодом и тестами
 deploy/                                  — ansible-плейбуки деплоя (Docker): бот, Jaeger/tracing, Dozzle/логи
 ```
 
@@ -82,11 +84,15 @@ Periodically tags a random chat member with an insult. Uses a priority queue (mi
 
 ### Settings (`internal/handlers/settings/`)
 
-`/settings` command — admin-only in group chats:
+`/settings` command — доступна в групповых чатах (в личке отказывает):
 
 - `/settings` — view current settings
 - `/settings <key> <value>` — modify a setting
 - `/settings reset` — reset to defaults
+
+**Проверки прав администратора в коде нет** — поменять настройки может любой участник группы.
+Раньше здесь было написано «admin-only»; расхождение нашлось при baseline спек и зафиксировано в
+`openspec/specs/chat-settings/spec.md`. Либо добавить проверку роли, либо признать это поведением.
 
 ### Stats (`internal/handlers/stat/`)
 
@@ -212,9 +218,15 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 | `make fmt` | Форматирование через golangci-lint |
 | `make migration name=<slug>` | Создать пустую пару up/down-миграций в `db/migrations/` |
 | `make align` | Авто-выравнивание полей структур (`fieldalignment -fix`) |
+| `make spec-new name=<id>` | Создать change в `openspec/changes/` |
+| `make spec-check` | Гейт: структура спек, связь с кодом и тестами, храповик покрытия |
+| `make spec-status` | Покрытие по capability, активные changes, технический долг |
+| `make spec-cover cap=<имя>` | Сценарии одной capability со статусами |
+| `make spec-archive name=<id>` | Влить дельту в living specs и заархивировать change |
+| `make test` | `go test ./...` |
 | `make release-patch` / `release-minor` / `release-major` | Создать и запушить новый семвер-тег (триггерит pipeline `Труба`). Только с master, чистого working tree, синхронизированного с origin. Спрашивает `[y/N]` перед push'ем. |
 
-Тесты: `go test ./...` (отдельной make-цели нет).
+Тесты: `make test` или `go test ./...`.
 
 ## Architectural Principles
 
@@ -225,8 +237,48 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 - **Thread safety** — `sync.RWMutex` for message collections
 - **Async statistics** — all `stats.Inc()` calls run asynchronously
 
+## Спеки и изменения
+
+Репозиторий на уровне spec-anchored: наблюдаемое поведение бота описано в `openspec/specs/`, а
+каждое его изменение проходит через change в `openspec/changes/`. Полное руководство —
+**`SDD.md`** в корне, здесь только правила.
+
+**Изменение наблюдаемого поведения начинается с дельты, а не с кода.** Если по ходу работы решение
+поменялось — сначала правится change, потом код.
+
+Маршрут по риску:
+
+| Режим | Когда | Артефакты |
+|---|---|---|
+| Без спеки | опечатка, рефакторинг без смены поведения, зависимости, деплой, CI | PR-описание |
+| Lite | понятный баг, локальная правка хендлера, другой текст | `proposal.md` + `tasks.md`, дельта — если меняется ожидаемое поведение |
+| Полный | промпты и `sanitize`; вероятности и дефолты; миграции; формат `chat_settings`, `response_log`, `chat_history`; смена модели или её параметров; новый хендлер | proposal + дельта + `design.md` + `tasks.md` |
+
+Появился новый контракт (схема БД, формат промпта, внешний API) — режим поднимается до полного.
+
+Правила:
+
+- Сценарий получает идентификатор `[PREFIX-NNN]`, тест — якорь `// spec: PREFIX-NNN` над функцией.
+- Ссылок на идентификаторы сценариев в рабочем коде быть не должно — только в тестах.
+- Спека описывает наблюдаемое поведение; имена типов, функций и структура пакетов туда не попадают.
+- Новый или изменённый сценарий обязан быть `covered` либо `manual` с причиной.
+- `make spec-archive` выполняется **в той же ветке до мержа**; он вливает дельту и удаляет каталог
+  change. Архив завершённых предложений в репозитории не хранится: мотивация остаётся в истории
+  коммитов, а долгоживущие решения уезжают ADR'ом в вику.
+- При ревью проверяется spec drift: изменение поведения без change, дельта не совпадает с кодом,
+  незаархивированный завершённый change.
+- Обход гейта — строка `[skip-spec: причина]` отдельной строкой в теле коммита; причина обязательна.
+
+### Ветки и коммиты
+
+**Одно полноценное изменение — одна ветка и один коммит.** Промежуточные шаги внутри работы не
+попадают в историю: перед PR ветка сквошится в один коммит с осмысленным сообщением. Заголовок —
+короткий, в нижнем регистре, как в существующей истории; тело объясняет, что изменилось и почему,
+а не перечисляет шаги.
+
 ## Gotchas
 
+- Рабочий стейт агентных сессий (`docs/superpowers/`, `.superpowers/`) в git не попадает. Контракт изменения живёт в `openspec/changes/`, черновики и планы по дороге к нему — нет.
 - `CLAUDE.md` — симлинк на `AGENTS.md`. Редактировать нужно `AGENTS.md`; не перезаписывать `CLAUDE.md` как обычный файл.
 - При ошибке LLM (DeepSeek / GigaChat) генератор сообщений автоматически падает на list-based стратегию (Google Sheets) — отсутствие LLM-ключей не ломает бота, просто отключает AI-ветку.
 - `chathistory.Buffer` загружает историю из SQLite **только при первом обращении к chatID после старта** (`ensureLoadedLocked`); до этого момента `data[chatID]` пуст. Не путать с потерей данных.

@@ -1,0 +1,11 @@
+prefix: PERS
+
+owns:
+  - internal/handlers/personal
+
+scenarios:
+  PERS-001: todo
+  PERS-002: todo
+  PERS-003: todo
+  PERS-004: todo
+  PERS-005: todo

@@ -1,0 +1,28 @@
+prefix: PHOTO
+
+owns:
+  - internal/handlers/on_photo
+
+scenarios:
+  PHOTO-001: covered
+  PHOTO-002: covered
+  PHOTO-003: covered
+  PHOTO-004: covered
+  PHOTO-005: covered
+  PHOTO-006: covered
+  PHOTO-007: covered
+  PHOTO-008: covered
+  PHOTO-009: covered
+  PHOTO-010: covered
+  PHOTO-011: covered
+  PHOTO-012: covered
+  PHOTO-013: covered
+  PHOTO-014: covered
+  PHOTO-015: covered
+  PHOTO-016: covered
+  PHOTO-017: covered
+  PHOTO-018: covered
+  PHOTO-019: covered
+  PHOTO-020: covered
+  PHOTO-021: covered
+  PHOTO-022: covered

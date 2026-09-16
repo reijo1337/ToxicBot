@@ -14,6 +14,7 @@ func allPhotoAngles() []string {
 	return append(out, photoCaptionAngle, photoForwardAngle)
 }
 
+// spec: GEN-027
 func TestBuildPhotoSteering_WithAllAngles(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(1))
@@ -43,6 +44,7 @@ func TestBuildPhotoSteering_WithAllAngles(t *testing.T) {
 	assert.True(t, sawAngle, "за 2000 итераций должен встретиться режим с углом")
 }
 
+// spec: GEN-028
 func TestBuildPhotoSteering_OffImageAnglesGatedByFlags(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(7))
@@ -55,6 +57,7 @@ func TestBuildPhotoSteering_OffImageAnglesGatedByFlags(t *testing.T) {
 	}
 }
 
+// spec: GEN-029
 func TestPhotoAnglesNonSubstring(t *testing.T) {
 	t.Parallel()
 	angles := allPhotoAngles()

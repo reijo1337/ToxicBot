@@ -25,6 +25,7 @@ func setupChatHistoryDB(t *testing.T) *sqlx.DB {
 	return db
 }
 
+// spec: HIST-015
 func TestChatHistoryStorage_Load_NoRows(t *testing.T) {
 	t.Parallel()
 
@@ -36,6 +37,7 @@ func TestChatHistoryStorage_Load_NoRows(t *testing.T) {
 	assert.Nil(t, entries)
 }
 
+// spec: HIST-016
 func TestChatHistoryStorage_SaveLoad_RoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -67,6 +69,7 @@ func TestChatHistoryStorage_SaveLoad_RoundTrip(t *testing.T) {
 	assert.Equal(t, in, out)
 }
 
+// spec: HIST-017
 func TestChatHistoryStorage_Save_Replaces(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +84,7 @@ func TestChatHistoryStorage_Save_Replaces(t *testing.T) {
 	assert.Equal(t, []chathistory.Entry{{ID: 2, Text: "second"}}, out)
 }
 
+// spec: HIST-018
 func TestChatHistoryStorage_IsolatedByChat(t *testing.T) {
 	t.Parallel()
 

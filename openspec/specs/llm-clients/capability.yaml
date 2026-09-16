@@ -1,0 +1,22 @@
+prefix: LLM
+
+owns:
+  - internal/infrastructure/ai/deepseek
+  - internal/infrastructure/ai/gigachat
+
+scenarios:
+  LLM-001: covered
+  LLM-002: covered
+  LLM-003: covered
+  LLM-004: covered
+  LLM-005: covered
+  LLM-006: covered
+  LLM-007: covered
+  LLM-008: covered
+  LLM-009: covered
+  LLM-010: covered
+  LLM-011: covered
+  LLM-012: covered
+  LLM-013: covered
+  LLM-014: covered
+  LLM-015: covered

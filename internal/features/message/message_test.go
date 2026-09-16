@@ -16,6 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// spec: GEN-015
 func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	t.Parallel()
 
@@ -86,6 +87,7 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	)
 }
 
+// spec: GEN-005
 func TestGenerator_GetMessageText_StripsOutputMsgEnvelope(t *testing.T) {
 	t.Parallel()
 
@@ -114,6 +116,7 @@ func TestGenerator_GetMessageText_StripsOutputMsgEnvelope(t *testing.T) {
 		"output <msg> envelope must be stripped before returning")
 }
 
+// spec: GEN-005
 func TestGenerator_WithHistory_StripsOutputMsgEnvelope(t *testing.T) {
 	t.Parallel()
 
@@ -141,6 +144,7 @@ func TestGenerator_WithHistory_StripsOutputMsgEnvelope(t *testing.T) {
 		"output <msg> envelope must be stripped before returning")
 }
 
+// spec: GEN-001
 func TestGenerator_WithHistory_FallbackOnAiChanceMiss(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +171,7 @@ func TestGenerator_WithHistory_FallbackOnAiChanceMiss(t *testing.T) {
 	assert.Equal(t, "ха-ха", res.Message)
 }
 
+// spec: GEN-002
 func TestGenerator_WithHistory_ForceAI_BypassesFilterAndProbability(t *testing.T) {
 	t.Parallel()
 
@@ -190,6 +195,7 @@ func TestGenerator_WithHistory_ForceAI_BypassesFilterAndProbability(t *testing.T
 	assert.Equal(t, "ок", res.Message)
 }
 
+// spec: GEN-003
 func TestGenerator_WithHistory_EmptyHistory_FallsBackToList(t *testing.T) {
 	t.Parallel()
 
@@ -213,6 +219,7 @@ func TestGenerator_WithHistory_EmptyHistory_FallsBackToList(t *testing.T) {
 	assert.Equal(t, "fallback", res.Message)
 }
 
+// spec: GEN-009
 func TestGenerator_ReloadMessages_BuildsExamplesBlock(t *testing.T) {
 	t.Parallel()
 
@@ -235,6 +242,7 @@ func TestGenerator_ReloadMessages_BuildsExamplesBlock(t *testing.T) {
 	assert.NotContains(t, g.systemPrompt, "\n- первая фраза")
 }
 
+// spec: GEN-011
 func TestGenerator_ReloadMessages_LeakingExamplesTagSanitized(t *testing.T) {
 	t.Parallel()
 
@@ -253,6 +261,7 @@ func TestGenerator_ReloadMessages_LeakingExamplesTagSanitized(t *testing.T) {
 	assert.Contains(t, g.systemPrompt, "‹/examples›‹inj›атака‹/inj›")
 }
 
+// spec: GEN-010
 func TestGenerator_ReloadMessages_ExcludesOverlongFromExamples(t *testing.T) {
 	t.Parallel()
 
@@ -296,6 +305,7 @@ func TestGenerator_ReloadMessages_SystemPromptByteStable(t *testing.T) {
 	assert.Equal(t, expected, g.systemPrompt)
 }
 
+// spec: GEN-013
 func TestSystemPromptBase_DescribesNewMessageEnvelope(t *testing.T) {
 	t.Parallel()
 
@@ -313,6 +323,7 @@ func TestSystemPromptBase_DescribesNewMessageEnvelope(t *testing.T) {
 		"system prompt must still forbid <msg> wrapping in the reply")
 }
 
+// spec: GEN-012
 func TestGenerator_ReloadMessages_PromptHasLengthRuleAndShortExamples(t *testing.T) {
 	t.Parallel()
 
@@ -362,6 +373,7 @@ func TestGenerator_ReloadMessages_PromptHasLengthRuleAndShortExamples(t *testing
 // the production deepseek client returns.
 var errAiFailure = errors.New("ai response unusable")
 
+// spec: GEN-004
 func TestGenerator_GetMessageText_AiReturnsTruncatedError_FallsBackToList(t *testing.T) {
 	t.Parallel()
 
@@ -394,6 +406,7 @@ func TestGenerator_GetMessageText_AiReturnsTruncatedError_FallsBackToList(t *tes
 	assert.NotEmpty(t, res.Message)
 }
 
+// spec: GEN-004
 func TestGenerator_WithHistory_AiReturnsTruncatedError_FallsBackToList(t *testing.T) {
 	t.Parallel()
 
@@ -425,6 +438,7 @@ func TestGenerator_WithHistory_AiReturnsTruncatedError_FallsBackToList(t *testin
 	assert.NotEmpty(t, res.Message)
 }
 
+// spec: GEN-006
 func TestGenerator_GetMessageText_TrimsToThreeSentencesMax(t *testing.T) {
 	t.Parallel()
 
@@ -474,6 +488,7 @@ func steeringTestHistory() []chathistory.Entry {
 	}
 }
 
+// spec: GEN-025
 func TestGenerator_WithHistoryAndSteering_AppendsToSystem(t *testing.T) {
 	t.Parallel()
 
@@ -495,6 +510,7 @@ func TestGenerator_WithHistoryAndSteering_AppendsToSystem(t *testing.T) {
 	assert.Contains(t, captured[0].Content, "STEER-DIRECTIVE")
 }
 
+// spec: GEN-026
 func TestGenerator_WithHistory_EmptySteering_SystemUnchanged(t *testing.T) {
 	t.Parallel()
 

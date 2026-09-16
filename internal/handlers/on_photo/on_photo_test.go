@@ -137,6 +137,7 @@ func (env *testEnv) setupPhotoPipeline(description string) {
 		Return(description, nil)
 }
 
+// spec: PHOTO-001
 func TestHandle_HappyPath_WritesPairViaAddAll(t *testing.T) {
 	t.Parallel()
 
@@ -195,6 +196,7 @@ func TestHandle_HappyPath_WritesPairViaAddAll(t *testing.T) {
 	assert.True(t, capturedPair[1].FromBot)
 }
 
+// spec: PHOTO-002
 func TestHandle_NotReplyToBot_ChanceMiss_NoHistoryWrite(t *testing.T) {
 	t.Parallel()
 
@@ -210,6 +212,7 @@ func TestHandle_NotReplyToBot_ChanceMiss_NoHistoryWrite(t *testing.T) {
 	require.NoError(t, env.handler.Handle(ctx))
 }
 
+// spec: PHOTO-003
 func TestHandle_NilChat_ReturnsNil(t *testing.T) {
 	t.Parallel()
 
@@ -242,6 +245,7 @@ func TestHandle_MessageWithoutPhoto_ReturnsNil(t *testing.T) {
 	require.NoError(t, env.handler.Handle(ctx))
 }
 
+// spec: PHOTO-005
 func TestHandle_DescriberError_NoHistoryWrite(t *testing.T) {
 	t.Parallel()
 
@@ -263,6 +267,7 @@ func TestHandle_DescriberError_NoHistoryWrite(t *testing.T) {
 	require.NoError(t, env.handler.Handle(ctx))
 }
 
+// spec: PHOTO-006
 func TestHandle_ReplierError_NoAddAll(t *testing.T) {
 	t.Parallel()
 
@@ -285,6 +290,7 @@ func TestHandle_ReplierError_NoAddAll(t *testing.T) {
 	require.Error(t, err)
 }
 
+// spec: PHOTO-004
 func TestHandle_AlbumDedup_SkipsSecondPhotoInSameAlbum(t *testing.T) {
 	t.Parallel()
 
@@ -309,6 +315,7 @@ func TestHandle_AlbumDedup_SkipsSecondPhotoInSameAlbum(t *testing.T) {
 	require.NoError(t, env.handler.Handle(newCtx(second, goodSender())))
 }
 
+// spec: PHOTO-007
 func TestDescribePrompt_ContainsAntiInjectionGuards(t *testing.T) {
 	t.Parallel()
 
@@ -316,6 +323,7 @@ func TestDescribePrompt_ContainsAntiInjectionGuards(t *testing.T) {
 	assert.Contains(t, describePrompt, "На изображении")
 }
 
+// spec: PHOTO-008
 func TestDescribePrompt_AsksForMemeEssence(t *testing.T) {
 	t.Parallel()
 	assert.Contains(t, describePrompt, "в чём шутка",
@@ -326,6 +334,7 @@ func TestDescribePrompt_AsksForMemeEssence(t *testing.T) {
 		"opening convention must be preserved")
 }
 
+// spec: PHOTO-012
 func TestBuildPrompt_DirectFromUser_AddsContextWithAuthorPhrase(t *testing.T) {
 	t.Parallel()
 
@@ -341,6 +350,7 @@ func TestBuildPrompt_DirectFromUser_AddsContextWithAuthorPhrase(t *testing.T) {
 	assert.NotContains(t, got, "<caption>")
 }
 
+// spec: PHOTO-011
 func TestBuildPrompt_WithCaption_WrapsCaptionInTagAfterContext(t *testing.T) {
 	t.Parallel()
 
@@ -375,6 +385,7 @@ func TestBuildPrompt_AttackerCaptionEscaped(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(got, "</caption>"))
 }
 
+// spec: PHOTO-013
 func TestBuildPrompt_ForwardedFromChannelWithUsername_MentionsChannel(t *testing.T) {
 	t.Parallel()
 
@@ -405,6 +416,7 @@ func TestBuildPrompt_ForwardedFromChannelWithoutUsername_MentionsTitle(t *testin
 	)
 }
 
+// spec: PHOTO-014
 func TestBuildPrompt_ForwardedFromUser_MentionsOriginalSender(t *testing.T) {
 	t.Parallel()
 
@@ -420,6 +432,7 @@ func TestBuildPrompt_ForwardedFromUser_MentionsOriginalSender(t *testing.T) {
 	)
 }
 
+// spec: PHOTO-015
 func TestBuildPrompt_ChannelTakesPrecedenceOverUserInContext(t *testing.T) {
 	t.Parallel()
 
@@ -545,6 +558,7 @@ func TestExtractPhotoOrigin_ChannelTitleSanitized(t *testing.T) {
 	assert.Contains(t, got.ForwardedFromChannel, "‹system›")
 }
 
+// spec: PHOTO-017
 func TestExtractPhotoOrigin_OriginalChatCollapsesToEmpty_NoTrailingPreposition(t *testing.T) {
 	t.Parallel()
 
@@ -572,6 +586,7 @@ func TestExtractPhotoOrigin_OriginalChatCollapsesToEmpty_NoTrailingPreposition(t
 	assert.NotContains(t, ctx, "переслано из канала")
 }
 
+// spec: PHOTO-016
 func TestExtractPhotoOrigin_AutomaticForward_IgnoresForwardedFromChannel(t *testing.T) {
 	t.Parallel()
 
@@ -635,6 +650,7 @@ func TestExtractPhotoOrigin_OriginalChatEmpty_FallsThroughToOriginalSender(t *te
 	assert.Equal(t, "@vasya", got.ForwardedFromUser)
 }
 
+// spec: PHOTO-009
 func TestHandle_LongDescriptionTruncatedAndWrapped(t *testing.T) {
 	t.Parallel()
 
@@ -669,6 +685,7 @@ func TestHandle_LongDescriptionTruncatedAndWrapped(t *testing.T) {
 	assert.LessOrEqual(t, utf8.RuneCountInString(inner), 1000)
 }
 
+// spec: PHOTO-010
 func TestHandle_DescriptionWithClosingTagSanitized(t *testing.T) {
 	t.Parallel()
 
@@ -697,6 +714,7 @@ func TestHandle_DescriptionWithClosingTagSanitized(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(capturedPair[0].Text, "</vision_description>"))
 }
 
+// spec: PHOTO-018
 func TestFormatAuthor(t *testing.T) {
 	t.Parallel()
 
@@ -735,6 +753,7 @@ func TestFormatAuthor(t *testing.T) {
 	}
 }
 
+// spec: PHOTO-019
 func TestHandle_ForwardedFromChannel_HistoryEntryMentionsChannelInContext(t *testing.T) {
 	t.Parallel()
 
@@ -828,6 +847,7 @@ func TestHandle_UsesFirstNameWhenUsernameEmpty(t *testing.T) {
 	assert.Equal(t, "Боб", capturedPair[0].Author)
 }
 
+// spec: PHOTO-020
 func TestHandle_FiltersBotEntriesFromLLMHistory(t *testing.T) {
 	t.Parallel()
 
@@ -890,6 +910,7 @@ func TestDropBotEntries_KeepsUsersDropsBotInOrder(t *testing.T) {
 	}
 }
 
+// spec: PHOTO-021
 func TestDropBotEntries_DoesNotMutateInput(t *testing.T) {
 	t.Parallel()
 
@@ -931,6 +952,8 @@ func TestDropBotEntries_EmptyAndEdgeCases(t *testing.T) {
 	require.Len(t, dropBotEntries(allUser), 2)
 }
 
+// spec: PHOTO-022
+//
 //nolint:paralleltest // sets global OTel tracer provider / mutates package state; must run serially
 func TestHandle_EmitsOnPhotoSpanWithSteering(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()

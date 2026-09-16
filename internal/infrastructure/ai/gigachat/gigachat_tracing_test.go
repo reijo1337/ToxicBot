@@ -16,6 +16,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
+// spec: LLM-015
+//
 //nolint:paralleltest // sets global OTel tracer provider / mutates package state; must run serially
 func TestGenerateContent_EmitsGenAiSpan(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()

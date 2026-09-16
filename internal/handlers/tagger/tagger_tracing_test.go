@@ -15,6 +15,8 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// spec: TAG-009
+//
 //nolint:paralleltest // sets global OTel tracer provider / mutates package state; must run serially
 func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()

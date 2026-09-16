@@ -42,6 +42,7 @@ func TestFormatUserContent_ReplyToEvicted_NoArrow(t *testing.T) {
 		"reply_to attribute must be omitted when target ID is not in history")
 }
 
+// spec: GEN-021
 func TestFormatUserContent_NewlineInTextBecomesSpace(t *testing.T) {
 	t.Parallel()
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
@@ -50,6 +51,7 @@ func TestFormatUserContent_NewlineInTextBecomesSpace(t *testing.T) {
 	assert.Equal(t, `<msg from="@alice" time="2026-05-01T00:00">line1 line2</msg>`, got)
 }
 
+// spec: GEN-020
 func TestFormatUserContent_AngleBracketsEscaped(t *testing.T) {
 	t.Parallel()
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
@@ -59,6 +61,7 @@ func TestFormatUserContent_AngleBracketsEscaped(t *testing.T) {
 	assert.NotContains(t, got, "</b>")
 }
 
+// spec: GEN-023
 func TestFormatUserContent_ReplyToAttributeQuoteStripped(t *testing.T) {
 	t.Parallel()
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
@@ -79,6 +82,7 @@ func TestFormatUserContent_ReplyToAttributeQuoteStripped(t *testing.T) {
 	)
 }
 
+// spec: GEN-022
 func TestFormatUserContent_LongTextTruncated(t *testing.T) {
 	t.Parallel()
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
@@ -110,6 +114,7 @@ func TestFormatUserContent_NotPreFormatted_StillSanitizes(t *testing.T) {
 	assert.NotContains(t, got, "<photo>", "PreFormatted=false must run SanitizeText on the body")
 }
 
+// spec: GEN-014
 func TestFormatUserContent_TriggerGetsNowAttr(t *testing.T) {
 	t.Parallel()
 	t1 := time.Date(2026, 5, 1, 12, 34, 0, 0, time.UTC)
@@ -118,6 +123,7 @@ func TestFormatUserContent_TriggerGetsNowAttr(t *testing.T) {
 	assert.Equal(t, `<msg from="@alice" time="2026-05-01T12:34" now="true">hello</msg>`, got)
 }
 
+// spec: GEN-014
 func TestBuildChatCompletions_OnlyLastUserMarkedNow(t *testing.T) {
 	t.Parallel()
 	t1 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
@@ -131,6 +137,7 @@ func TestBuildChatCompletions_OnlyLastUserMarkedNow(t *testing.T) {
 	assert.Contains(t, msgs[2].Content, `now="true"`, "the most recent user message must be marked")
 }
 
+// spec: GEN-015
 func TestBuildChatCompletions_AssemblyOrderAndSystem(t *testing.T) {
 	t.Parallel()
 	system := "BE TOXIC"
@@ -161,6 +168,7 @@ func TestBuildChatCompletions_AssemblyOrderAndSystem(t *testing.T) {
 	)
 }
 
+// spec: GEN-016
 func TestBuildChatCompletions_BotEntrySanitizedToAssistant(t *testing.T) {
 	t.Parallel()
 	system := "S"
@@ -186,6 +194,7 @@ func TestBuildChatCompletions_BotEntrySanitizedToAssistant(t *testing.T) {
 	)
 }
 
+// spec: GEN-017
 func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 	t.Parallel()
 	system := "S"
@@ -249,6 +258,7 @@ func TestBuildChatCompletions_SingleUser(t *testing.T) {
 	)
 }
 
+// spec: GEN-018
 func TestBuildChatCompletions_OutOfOrderEntriesSortedByTime(t *testing.T) {
 	t.Parallel()
 	system := "S"
@@ -276,6 +286,7 @@ func TestBuildChatCompletions_OutOfOrderEntriesSortedByTime(t *testing.T) {
 	)
 }
 
+// spec: GEN-018
 func TestBuildChatCompletions_SameSecondTieBrokenByID(t *testing.T) {
 	t.Parallel()
 	system := "S"
@@ -295,6 +306,7 @@ func TestBuildChatCompletions_SameSecondTieBrokenByID(t *testing.T) {
 	assert.Contains(t, msgs[2].Content, "later")
 }
 
+// spec: GEN-019
 func TestBuildChatCompletions_LeadingAssistantsAreSkipped(t *testing.T) {
 	t.Parallel()
 	system := "S"

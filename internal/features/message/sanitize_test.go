@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// spec: GEN-022
 func TestSanitizeText(t *testing.T) {
 	t.Parallel()
 
@@ -83,6 +84,7 @@ func TestSanitizeText(t *testing.T) {
 	}
 }
 
+// spec: GEN-007
 func TestSanitizeText_TruncationDoesNotSplitRune(t *testing.T) {
 	t.Parallel()
 
@@ -93,6 +95,7 @@ func TestSanitizeText_TruncationDoesNotSplitRune(t *testing.T) {
 	assert.True(t, utf8.ValidString(got))
 }
 
+// spec: GEN-024
 func TestSanitizeAuthor(t *testing.T) {
 	t.Parallel()
 
@@ -156,6 +159,7 @@ func TestSanitizeAuthor(t *testing.T) {
 	}
 }
 
+// spec: GEN-008
 func TestStripOutputMsgEnvelope_TruncatedByAPI(t *testing.T) {
 	t.Parallel()
 
@@ -189,6 +193,7 @@ func TestStripOutputMsgEnvelope_TruncatedByAPI(t *testing.T) {
 	}
 }
 
+// spec: GEN-006
 func TestTrimToSentences(t *testing.T) {
 	t.Parallel()
 

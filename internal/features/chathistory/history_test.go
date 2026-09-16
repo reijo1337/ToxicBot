@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// spec: HIST-001
 func TestBuffer_Add_StoresFullEntry(t *testing.T) {
 	t.Parallel()
 
@@ -37,6 +38,7 @@ func TestBuffer_Add_StoresFullEntry(t *testing.T) {
 	assert.True(t, history[1].FromBot)
 }
 
+// spec: HIST-002
 func TestBuffer_GetEmptyChat(t *testing.T) {
 	t.Parallel()
 
@@ -45,6 +47,7 @@ func TestBuffer_GetEmptyChat(t *testing.T) {
 	assert.Empty(t, history)
 }
 
+// spec: HIST-003
 func TestBuffer_IndependentChats(t *testing.T) {
 	t.Parallel()
 
@@ -60,6 +63,7 @@ func TestBuffer_IndependentChats(t *testing.T) {
 	assert.Equal(t, "chat2", h2[0].Text)
 }
 
+// spec: HIST-004
 func TestBuffer_Overflow(t *testing.T) {
 	t.Parallel()
 
@@ -75,18 +79,21 @@ func TestBuffer_Overflow(t *testing.T) {
 	assert.Equal(t, "msg4", history[2].Text)
 }
 
+// spec: HIST-007
 func TestNewBuffer_PanicsOnZeroMaxSize(t *testing.T) {
 	t.Parallel()
 
 	assert.Panics(t, func() { chathistory.NewBuffer(0) })
 }
 
+// spec: HIST-007
 func TestNewBuffer_PanicsOnNegativeMaxSize(t *testing.T) {
 	t.Parallel()
 
 	assert.Panics(t, func() { chathistory.NewBuffer(-1) })
 }
 
+// spec: HIST-005
 func TestBuffer_AddAll_AppendsAdjacentEntries(t *testing.T) {
 	t.Parallel()
 
@@ -105,6 +112,7 @@ func TestBuffer_AddAll_AppendsAdjacentEntries(t *testing.T) {
 	assert.True(t, history[2].FromBot)
 }
 
+// spec: HIST-004
 func TestBuffer_AddAll_RespectsMaxSize(t *testing.T) {
 	t.Parallel()
 
@@ -122,6 +130,7 @@ func TestBuffer_AddAll_RespectsMaxSize(t *testing.T) {
 	assert.Equal(t, "d", history[2].Text)
 }
 
+// spec: HIST-005
 func TestBuffer_AddAll_EmptyArgs_NoOp(t *testing.T) {
 	t.Parallel()
 
@@ -130,6 +139,7 @@ func TestBuffer_AddAll_EmptyArgs_NoOp(t *testing.T) {
 	assert.Empty(t, buf.Get(1))
 }
 
+// spec: HIST-006
 func TestBuffer_ConcurrentAccess(t *testing.T) {
 	t.Parallel()
 

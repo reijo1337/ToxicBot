@@ -1,0 +1,24 @@
+prefix: BULL
+
+owns:
+  - internal/handlers/bulling
+
+scenarios:
+  BULL-001: todo
+  BULL-002: todo
+  BULL-003: todo
+  BULL-004: todo
+  BULL-005: todo
+  BULL-006: todo
+  BULL-007: todo
+  BULL-008: todo
+  BULL-009: todo
+  BULL-010: todo
+  BULL-011: manual
+  BULL-012: covered
+  BULL-013: todo
+
+notes:
+  BULL-011: >-
+    Задержка и статус набора текста проверяются глазами в живом чате: автотест на sleep
+    добавил бы секунды к прогону ради проверки таймера.

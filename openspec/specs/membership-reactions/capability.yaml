@@ -1,0 +1,12 @@
+prefix: MEMB
+
+owns:
+  - internal/handlers/on_user_join
+  - internal/handlers/on_user_left
+
+scenarios:
+  MEMB-001: todo
+  MEMB-002: todo
+  MEMB-003: todo
+  MEMB-004: covered
+  MEMB-005: todo

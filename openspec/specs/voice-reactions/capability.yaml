@@ -1,0 +1,17 @@
+prefix: VOICE
+
+owns:
+  - internal/handlers/on_voice
+
+scenarios:
+  VOICE-001: todo
+  VOICE-002: todo
+  VOICE-003: todo
+  VOICE-004: manual
+  VOICE-005: todo
+  VOICE-006: todo
+
+notes:
+  VOICE-004: >-
+    Пауза до пятнадцати секунд проверяется в живом чате: автотест на неё либо ждёт
+    столько же, либо проверяет не поведение, а мок таймера.
