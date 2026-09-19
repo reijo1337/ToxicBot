@@ -34,6 +34,8 @@ type stubSub struct{ slug string }
 func (s stubSub) Slug() string               { return s.slug }
 func (stubSub) Handle(telebot.Context) error { return nil }
 
+// spec: DISP-004
+//
 //nolint:paralleltest // sets global OTel tracer provider / mutates package state; must run serially
 func TestDispatcher_StartsRootSpanNamedByEndpoint(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()

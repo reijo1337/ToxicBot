@@ -12,9 +12,12 @@ jobs:
 
   lint:
     uses: ./.github/workflows/lint.yml
-  
+
+  spec:
+    uses: ./.github/workflows/spec.yml
+
   binary:
-    needs: lint
+    needs: [lint, spec]
     uses: ./.github/workflows/binary.yml
     secrets: inherit
     with:

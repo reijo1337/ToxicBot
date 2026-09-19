@@ -1,0 +1,17 @@
+prefix: STAT
+
+owns:
+  - internal/features/stats
+  - internal/handlers/stat
+  - internal/infrastructure/storage/db/response_log.go
+
+scenarios:
+  STAT-001: todo
+  STAT-002: todo
+  STAT-003: todo
+  STAT-004: todo
+  STAT-005: todo
+  STAT-006: todo
+  STAT-007: todo
+  STAT-008: todo
+  STAT-009: todo

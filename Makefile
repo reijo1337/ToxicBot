@@ -9,6 +9,51 @@ GOLANGCI_LINT_DOCKER = docker run --rm \
 	-w /app \
 	golangci/golangci-lint:$(GOLANGCI_LINT_VERSION)
 
+.PHONY: spec-new spec-check spec-status spec-cover spec-archive test
+
+### ── SDD: спеки, изменения, гейт ──────────────────────────────────────
+### Руководство — docs/SDD.md
+
+OPENSPEC = OPENSPEC_TELEMETRY=0 npx -y @fission-ai/openspec@1.13.0
+SPECCTL = $(GO) run ./tools/specctl
+SPEC_BASE ?= origin/master
+
+### создаёт новый change: make spec-new name=fix-photo-loop
+spec-new:
+	@test -n "$(name)" || { echo "нужно имя: make spec-new name=<change-id>"; exit 1; }
+	$(OPENSPEC) new change $(name)
+	@echo "готово: openspec/changes/$(name) — заполни proposal.md, дельту в specs/ и tasks.md"
+
+### полная проверка контура: структура спек, связь с кодом и тестами
+spec-check:
+	$(OPENSPEC) validate --all --strict
+	$(SPECCTL) verify
+	$(SPECCTL) drift --base $(SPEC_BASE)
+	$(SPECCTL) coverage --base $(SPEC_BASE)
+	-$(SPECCTL) orphan
+
+### что сейчас в работе: покрытие, активные changes, технический долг
+spec-status:
+	$(SPECCTL) report
+	@echo
+	$(OPENSPEC) list
+
+### сценарии одной capability: make spec-cover cap=photo-reactions
+spec-cover:
+	@test -n "$(cap)" || { echo "нужно имя: make spec-cover cap=<capability>"; exit 1; }
+	$(SPECCTL) cover --cap $(cap)
+
+### вливает дельту в living specs и убирает change; архив в репозитории не живёт
+spec-archive:
+	@test -n "$(name)" || { echo "нужно имя: make spec-archive name=<change-id>"; exit 1; }
+	$(OPENSPEC) archive $(name) -y
+	rm -rf openspec/changes/archive
+	@echo "дельта влита в openspec/specs, каталог change убран"
+
+### прогоняет все тесты
+test:
+	$(GO) test ./...
+
 ### билдит докер образ для выравнивания структур
 align-build:
 	DOCKER_SCAN_SUGGEST=false docker build -t golang-align-check --no-cache - < $(PWD)/tools/align.Dockerfile

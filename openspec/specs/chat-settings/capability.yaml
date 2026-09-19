@@ -1,0 +1,21 @@
+prefix: SET
+
+owns:
+  - internal/features/chatsettings
+  - internal/domain/chat
+  - internal/handlers/settings
+  - internal/infrastructure/storage/db/chat_settings.go
+
+scenarios:
+  SET-001: todo
+  SET-002: todo
+  SET-003: todo
+  SET-004: todo
+  SET-005: todo
+  SET-006: todo
+  SET-007: todo
+  SET-008: todo
+  SET-009: todo
+  SET-010: todo
+  SET-011: todo
+  SET-012: todo

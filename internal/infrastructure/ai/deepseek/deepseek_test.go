@@ -45,6 +45,7 @@ func newClientForTest(t *testing.T, srv *httptest.Server) *Client {
 	return &Client{sdk: sdk, model: "deepseek-chat", maxTokens: 150, temperature: 1.1}
 }
 
+// spec: LLM-001
 func TestChat_PutsNameOnUserAndAssistant_ButNotSystem(t *testing.T) {
 	t.Parallel()
 
@@ -101,6 +102,7 @@ func TestChat_PutsNameOnUserAndAssistant_ButNotSystem(t *testing.T) {
 	assert.Equal(t, "@toxic_bot", got.Messages[2].Name)
 }
 
+// spec: LLM-002
 func TestChat_RejectsEmptyInput(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -114,6 +116,7 @@ func TestChat_RejectsEmptyInput(t *testing.T) {
 	require.Error(t, err)
 }
 
+// spec: LLM-008
 func TestChat_WrapsHTTPErrors(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -131,6 +134,7 @@ func TestChat_WrapsHTTPErrors(t *testing.T) {
 		"errors must be wrapped with a context-friendly prefix")
 }
 
+// spec: LLM-005
 func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsLength(t *testing.T) {
 	t.Parallel()
 
@@ -162,6 +166,7 @@ func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsLength(t *testing.T) 
 	)
 }
 
+// spec: LLM-006
 func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *testing.T) {
 	t.Parallel()
 
@@ -194,6 +199,7 @@ func TestChat_ReturnsErrResponseTruncatedWhenFinishReasonIsContentFilter(t *test
 	)
 }
 
+// spec: LLM-007
 func TestChat_ReturnsContentWhenFinishReasonIsStop(t *testing.T) {
 	t.Parallel()
 
@@ -214,6 +220,7 @@ func TestChat_ReturnsContentWhenFinishReasonIsStop(t *testing.T) {
 	assert.Equal(t, "Иди отсюда.", out)
 }
 
+// spec: LLM-003
 func TestChat_SendsMaxTokensAndTemperature(t *testing.T) {
 	t.Parallel()
 
@@ -243,6 +250,7 @@ func TestChat_SendsMaxTokensAndTemperature(t *testing.T) {
 	assert.InDelta(t, 1.1, got.Temperature, 0.0001, "temperature must reach the API")
 }
 
+// spec: LLM-004
 func TestChat_DisablesThinkingMode(t *testing.T) {
 	t.Parallel()
 

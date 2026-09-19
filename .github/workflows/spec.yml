@@ -1,0 +1,56 @@
+name: Spec gate reusable
+
+on: [workflow_call]
+
+env:
+  OPENSPEC_TELEMETRY: 0
+  OPENSPEC: npx -y @fission-ai/openspec@1.13.0
+
+jobs:
+  spec:
+    name: spec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # drift и храповик сравнивают ветку с origin/master — нужна полная история
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          # версия берётся из go.mod, чтобы гейт не отставал от проекта
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Структура спек и дельт
+        run: $OPENSPEC validate --all --strict
+
+      - name: Сценарии закрыты тестами
+        run: go run ./tools/specctl verify
+
+      - name: Поведение не разошлось со спеками
+        run: go run ./tools/specctl drift --base origin/master
+
+      - name: Технический долг не вырос
+        run: go run ./tools/specctl coverage --base origin/master
+
+      - name: Сводка
+        if: always()
+        run: |
+          go run ./tools/specctl orphan || true
+          go run ./tools/specctl report
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          # версия берётся из go.mod, чтобы гейт не отставал от проекта
+          go-version-file: go.mod
+      - name: go test
+        run: go test ./...

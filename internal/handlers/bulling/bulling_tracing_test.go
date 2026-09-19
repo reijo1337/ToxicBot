@@ -44,6 +44,8 @@ func (c *fakeCtx) Set(k string, v interface{}) {
 }
 func (c *fakeCtx) Get(k string) interface{} { return c.store[k] }
 
+// spec: BULL-012
+//
 //nolint:paralleltest // sets global OTel tracer provider / mutates package state; must run serially
 func TestHandle_EmitsBullingSpanOnSkip(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()

@@ -1,0 +1,25 @@
+prefix: HIST
+
+owns:
+  - internal/features/chathistory
+  - internal/infrastructure/storage/db/chat_history.go
+
+scenarios:
+  HIST-001: covered
+  HIST-002: covered
+  HIST-003: covered
+  HIST-004: covered
+  HIST-005: covered
+  HIST-006: covered
+  HIST-007: covered
+  HIST-008: covered
+  HIST-009: covered
+  HIST-010: covered
+  HIST-011: covered
+  HIST-012: covered
+  HIST-013: covered
+  HIST-014: covered
+  HIST-015: covered
+  HIST-016: covered
+  HIST-017: covered
+  HIST-018: covered

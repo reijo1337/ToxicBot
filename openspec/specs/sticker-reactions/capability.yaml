@@ -1,0 +1,13 @@
+prefix: STK
+
+owns:
+  - internal/handlers/on_sticker
+
+scenarios:
+  STK-001: todo
+  STK-002: todo
+  STK-003: todo
+  STK-004: todo
+  STK-005: todo
+  STK-006: todo
+  STK-007: todo

@@ -1,0 +1,36 @@
+prefix: GEN
+
+owns:
+  - internal/features/message
+  - internal/features/phrase_filter
+
+scenarios:
+  GEN-001: covered
+  GEN-002: covered
+  GEN-003: covered
+  GEN-004: covered
+  GEN-005: covered
+  GEN-006: covered
+  GEN-007: covered
+  GEN-008: covered
+  GEN-009: covered
+  GEN-010: covered
+  GEN-011: covered
+  GEN-012: covered
+  GEN-013: covered
+  GEN-014: covered
+  GEN-015: covered
+  GEN-016: covered
+  GEN-017: covered
+  GEN-018: covered
+  GEN-019: covered
+  GEN-020: covered
+  GEN-021: covered
+  GEN-022: covered
+  GEN-023: covered
+  GEN-024: covered
+  GEN-025: covered
+  GEN-026: covered
+  GEN-027: covered
+  GEN-028: covered
+  GEN-029: covered

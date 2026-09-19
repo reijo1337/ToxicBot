@@ -4,4 +4,19 @@
 sas.db
 .opik-tracing-enabled
 .serena
-superpowers
+.superpowers/
+.claude/settings.local.json
+.claude/.opik-tracing-enabled
+
+# скиллы и команды, которые генерирует openspec init/update под конкретного агента:
+# ставятся локально одной командой, в истории репозитория им делать нечего
+.claude/skills/
+.claude/commands/
+.agents/
+
+# рабочий стейт агентных сессий: черновики brainstorming, планы, отчёты по задачам.
+# контракт изменения живёт в openspec/, а это заметки по дороге к нему
+docs/superpowers/
+
+# завершённые changes: дельта влита в openspec/specs, остальное живёт в истории коммитов
+openspec/changes/archive/

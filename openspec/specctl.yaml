@@ -1,0 +1,25 @@
+# Настройки гейта specctl. Руководство — SDD.md в корне репозитория.
+
+# Пакеты, которым позволено не принадлежать ни одной capability:
+# точка входа, общие утилиты, конфигурация и сам инструментарий.
+allowed_orphans:
+  - cmd
+  - pkg
+  - tools
+  - internal/config
+  - internal/usecase
+  - internal/infrastructure/sheets
+
+# Пути, изменение которых никогда не считается изменением поведения бота.
+skip_drift:
+  - deploy
+  - docs
+  - openspec
+  - tools
+  - .github
+  - Makefile
+  - README.md
+  - AGENTS.md
+  - .gitignore
+  - go.mod
+  - go.sum

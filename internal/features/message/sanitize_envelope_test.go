@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// spec: GEN-005
 func TestStripOutputMsgEnvelope(t *testing.T) {
 	t.Parallel()
 

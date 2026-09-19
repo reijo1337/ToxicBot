@@ -102,6 +102,7 @@ func (l *recordingLogger) warnCount() int {
 	return l.warns
 }
 
+// spec: HIST-008
 func TestBuffer_Get_LoadsFromStoreOnce(t *testing.T) {
 	t.Parallel()
 
@@ -121,6 +122,7 @@ func TestBuffer_Get_LoadsFromStoreOnce(t *testing.T) {
 	assert.Equal(t, 1, store.loadCount(7), "store.Load must be called once and cached")
 }
 
+// spec: HIST-008
 func TestBuffer_Add_LazyLoadsThenAppendsAndSaves(t *testing.T) {
 	t.Parallel()
 
@@ -140,6 +142,7 @@ func TestBuffer_Add_LazyLoadsThenAppendsAndSaves(t *testing.T) {
 	assert.Equal(t, history, store.lastSaved(7))
 }
 
+// spec: HIST-009
 func TestBuffer_AddAll_SavesOncePerCall(t *testing.T) {
 	t.Parallel()
 
@@ -156,6 +159,7 @@ func TestBuffer_AddAll_SavesOncePerCall(t *testing.T) {
 	assert.Equal(t, buf.Get(7), store.lastSaved(7))
 }
 
+// spec: HIST-010
 func TestBuffer_Save_ReceivesTrimmedSliceOnOverflow(t *testing.T) {
 	t.Parallel()
 
@@ -172,6 +176,7 @@ func TestBuffer_Save_ReceivesTrimmedSliceOnOverflow(t *testing.T) {
 	assert.Equal(t, "c", saved[1].Text)
 }
 
+// spec: HIST-011
 func TestBuffer_Load_ErrorIsLoggedAndBufferStaysEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -184,6 +189,7 @@ func TestBuffer_Load_ErrorIsLoggedAndBufferStaysEmpty(t *testing.T) {
 	assert.GreaterOrEqual(t, log.warnCount(), 1)
 }
 
+// spec: HIST-011
 func TestBuffer_Load_ErrorRetriesOnNextCallAndPreservesHistory(t *testing.T) {
 	t.Parallel()
 
@@ -214,6 +220,7 @@ func TestBuffer_Load_ErrorRetriesOnNextCallAndPreservesHistory(t *testing.T) {
 	assert.GreaterOrEqual(t, log.warnCount(), 1)
 }
 
+// spec: HIST-012
 func TestBuffer_Add_AfterLoadFailureRecoversPersistedHistoryOnceStoreHeals(t *testing.T) {
 	t.Parallel()
 
@@ -244,6 +251,7 @@ func TestBuffer_Add_AfterLoadFailureRecoversPersistedHistoryOnceStoreHeals(t *te
 	assert.Equal(t, 2, store.loadCount(chatID), "Load must be retried after a previous failure")
 }
 
+// spec: HIST-013
 func TestBuffer_Save_ErrorDoesNotLoseInMemoryState(t *testing.T) {
 	t.Parallel()
 
@@ -260,6 +268,7 @@ func TestBuffer_Save_ErrorDoesNotLoseInMemoryState(t *testing.T) {
 	assert.GreaterOrEqual(t, log.warnCount(), 1)
 }
 
+// spec: HIST-014
 func TestBuffer_NoStore_BackwardCompatible(t *testing.T) {
 	t.Parallel()
 

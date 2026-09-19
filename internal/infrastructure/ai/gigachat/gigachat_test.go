@@ -30,6 +30,7 @@ func newTestClient(t *testing.T) *Client {
 	}
 }
 
+// spec: LLM-009
 func TestClient_GenerateContent_Success(t *testing.T) {
 	t.Parallel()
 
@@ -113,6 +114,7 @@ func TestClient_GenerateContent_Success(t *testing.T) {
 	assert.Equal(t, expectedText, result)
 }
 
+// spec: LLM-010
 func TestClient_Chat_HTTPError(t *testing.T) {
 	t.Parallel()
 
@@ -133,6 +135,7 @@ func TestClient_Chat_HTTPError(t *testing.T) {
 	assert.Contains(t, err.Error(), "chat API error (status 500)")
 }
 
+// spec: LLM-011
 func TestClient_Chat_EmptyChoices(t *testing.T) {
 	t.Parallel()
 
@@ -155,6 +158,7 @@ func TestClient_Chat_EmptyChoices(t *testing.T) {
 	assert.Contains(t, err.Error(), "no choices in response")
 }
 
+// spec: LLM-011
 func TestClient_Chat_EmptyContent(t *testing.T) {
 	t.Parallel()
 
@@ -181,6 +185,7 @@ func TestClient_Chat_EmptyContent(t *testing.T) {
 	assert.Contains(t, err.Error(), "empty content in response")
 }
 
+// spec: LLM-014
 func TestClient_Upload_Error(t *testing.T) {
 	t.Parallel()
 
@@ -201,6 +206,7 @@ func TestClient_Upload_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "upload error (status 400)")
 }
 
+// spec: LLM-012
 func TestClient_GetToken_Success(t *testing.T) {
 	t.Parallel()
 
@@ -243,6 +249,7 @@ func TestClient_GetToken_Success(t *testing.T) {
 	assert.Equal(t, "new-access-token", client.token)
 }
 
+// spec: LLM-012
 func TestClient_GetToken_Cached(t *testing.T) {
 	t.Parallel()
 
@@ -262,6 +269,7 @@ func TestClient_GetToken_Cached(t *testing.T) {
 	assert.Equal(t, "cached-token", token)
 }
 
+// spec: LLM-013
 func TestNew_MissingAuthKey(t *testing.T) {
 	t.Setenv("GIGACHAT_AUTH_KEY", "placeholder")
 	require.NoError(t, os.Unsetenv("GIGACHAT_AUTH_KEY"))
