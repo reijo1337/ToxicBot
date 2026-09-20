@@ -550,3 +550,32 @@ func TestSampleExamples_LargePoolSampledDistinct(t *testing.T) {
 		seen[g] = true
 	}
 }
+
+func TestGenerator_WithSystemPromptBase_ReplacesBaseKeepsExamples(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	storage := NewMockmessageRepository(ctrl)
+	storage.EXPECT().GetEnabledRandom().Return([]string{"подкол"}, nil)
+
+	g := &Generator{storage: storage}
+	WithSystemPromptBase("ВАРИАНТ")(g)
+	require.NoError(t, g.reloadMessages())
+
+	assert.Equal(t, "ВАРИАНТ\n<examples>\n  <example>подкол</example>\n</examples>", g.systemPrompt)
+}
+
+func TestGenerator_WithSystemPromptBase_EmptyKeepsDefault(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	storage := NewMockmessageRepository(ctrl)
+	storage.EXPECT().GetEnabledRandom().Return([]string{"подкол"}, nil)
+
+	g := &Generator{storage: storage}
+	WithSystemPromptBase("")(g)
+	require.NoError(t, g.reloadMessages())
+
+	assert.True(t, strings.HasPrefix(g.systemPrompt, DefaultSystemPromptBase()))
+	assert.Equal(t, systemPromptBase, DefaultSystemPromptBase())
+}

@@ -48,6 +48,7 @@ internal/
 pkg/                                     — shared utilities (logger, migrator, mapper)
 openspec/                                — living specs по capability + активные changes (см. SDD.md)
 tools/specctl/                           — гейт: связывает спеки с кодом и тестами
+tools/promptlab/                         — offline-стенд: варианты промпта × модели на кейсах из прода (см. README там)
 deploy/                                  — ansible-плейбуки деплоя (Docker): бот, Jaeger/tracing, Dozzle/логи
 ```
 
@@ -224,6 +225,7 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 | `make spec-cover cap=<имя>` | Сценарии одной capability со статусами |
 | `make spec-archive name=<id>` | Влить дельту в living specs и заархивировать change |
 | `make test` | `go test ./...` |
+| `make promptlab-fetch host=<ip>` / `promptlab-extract` / `promptlab-run` | Стенд сравнения промптов и моделей на реальных кейсах из прод-базы; данные в `tools/promptlab/data/` (gitignore). Ключи — `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` |
 | `make release-patch` / `release-minor` / `release-major` | Создать и запушить новый семвер-тег (триггерит pipeline `Труба`). Только с master, чистого working tree, синхронизированного с origin. Спрашивает `[y/N]` перед push'ем. |
 
 Тесты: `make test` или `go test ./...`.

@@ -9,7 +9,31 @@ GOLANGCI_LINT_DOCKER = docker run --rm \
 	-w /app \
 	golangci/golangci-lint:$(GOLANGCI_LINT_VERSION)
 
-.PHONY: spec-new spec-check spec-status spec-cover spec-archive test
+.PHONY: spec-new spec-check spec-status spec-cover spec-archive test promptlab-fetch promptlab-extract promptlab-run
+
+### ── promptlab: сравнение промптов и моделей на кейсах из прода ───────
+### Руководство — tools/promptlab/README.md
+
+PROMPTLAB = $(GO) run ./tools/promptlab
+PROMPTLAB_DATA = tools/promptlab/data
+
+### копия прод-базы с VDS: make promptlab-fetch host=1.2.3.4
+promptlab-fetch:
+	@test -n "$(host)" || { echo "нужен хост: make promptlab-fetch host=<ip>"; exit 1; }
+	@mkdir -p $(PROMPTLAB_DATA)
+	ssh root@$(host) 'cp /srv/ToxicBot/db/sas_sqlite.db /tmp/promptlab.db'
+	scp root@$(host):/tmp/promptlab.db $(PROMPTLAB_DATA)/sas_sqlite.db
+	ssh root@$(host) 'rm -f /tmp/promptlab.db'
+
+### нарезать базу на кейсы
+promptlab-extract:
+	$(PROMPTLAB) extract
+
+### прогнать матрицу вариант × модель. Ключи DEEPSEEK_API_KEY / OPENROUTER_API_KEY —
+### из окружения или из tools/promptlab/data/.env (каталог в gitignore)
+promptlab-run:
+	@set -a; [ -f $(PROMPTLAB_DATA)/.env ] && . $(PROMPTLAB_DATA)/.env; set +a; \
+	$(PROMPTLAB) run $(args)
 
 ### ── SDD: спеки, изменения, гейт ──────────────────────────────────────
 ### Руководство — docs/SDD.md

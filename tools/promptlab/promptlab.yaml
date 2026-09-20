@@ -1,0 +1,84 @@
+# Модели для promptlab. Ключи берутся из переменных окружения (api_key_env),
+# сюда не попадают. Параметры генерации повторяют прод: max_tokens как
+# DEEPSEEK_MAX_TOKENS, temperature как DEEPSEEK_TEMPERATURE.
+
+max_tokens: 500
+concurrency: 4
+
+models:
+  # baseline: то, на чём бот живёт сейчас. deepseek-v4-flash снята 2026-09-10,
+  # актуальный id — deepseek-flash (V4.1-Flash). thinking выключен, как в проде.
+  - name: deepseek-flash
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+    model: deepseek-flash
+    temperature: 1.1
+    extra_body:
+      thinking:
+        type: disabled
+
+  # Та же модель с температурой пониже — гипотеза, что 1.1 мешает держаться контекста.
+  - name: deepseek-flash-t09
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+    model: deepseek-flash
+    temperature: 0.9
+    extra_body:
+      thinking:
+        type: disabled
+
+  # Кандидаты через OpenRouter: один ключ на всех.
+  - name: grok-4.3
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: x-ai/grok-4.3
+    temperature: 1.1
+
+  # Reasoning-модели на OpenRouter думают по умолчанию, и reasoning-токены
+  # съедают max_tokens (finish_reason=length, как было с DeepSeek V4).
+  # Выключаем унифицированным полем OpenRouter; для не-reasoning моделей оно безвредно.
+  - name: kimi-k2.6
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: moonshotai/kimi-k2.6
+    temperature: 1.1
+    extra_body:
+      reasoning:
+        enabled: false
+
+  # Дешёвый сегмент: в разы дешевле DeepSeek, но есть жалобы на русскую грамматику.
+  # qwen3.8-flash на OpenRouter упирается в общий rate-limit Alibaba — берём соседей.
+  - name: qwen3.7-flash
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: qwen/qwen3.7-flash
+    temperature: 1.1
+    extra_body:
+      reasoning:
+        enabled: false
+
+  - name: qwen3.6-flash
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: qwen/qwen3.6-flash
+    temperature: 1.1
+    extra_body:
+      reasoning:
+        enabled: false
+
+  # GLM-5.3-flash: reasoning обязателен и не отключается — даём бюджет на него.
+  - name: glm-5.3-flash
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: z-ai/glm-5.3-flash
+    temperature: 1.1
+    max_tokens: 4000
+    extra_body:
+      reasoning:
+        effort: low
+
+  - name: mistral-medium-3.1
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: mistralai/mistral-medium-3.1
+    temperature: 1.1

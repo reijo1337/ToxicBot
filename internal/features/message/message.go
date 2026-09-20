@@ -104,8 +104,24 @@ type Generator struct {
 	ai                ai
 	messages          []string
 	systemPrompt      string
+	promptBase        string
 	updatePeriod      time.Duration
 	mu                sync.RWMutex
+}
+
+type Option func(*Generator)
+
+// WithSystemPromptBase подменяет базовую часть промпта (всё до <examples>) — seam
+// для tools/promptlab. Пустая строка оставляет промпт из кода.
+func WithSystemPromptBase(base string) Option {
+	return func(g *Generator) {
+		g.promptBase = base
+	}
+}
+
+// DefaultSystemPromptBase — базовая часть промпта из кода, точка отсчёта для tools/promptlab.
+func DefaultSystemPromptBase() string {
+	return systemPromptBase
 }
 
 func New(
@@ -116,6 +132,7 @@ func New(
 	meaningfullFilter meaningfullFilter,
 	ai ai,
 	updatePeriod time.Duration,
+	opts ...Option,
 ) (*Generator, error) {
 	out := Generator{
 		storage:           s,
@@ -124,6 +141,9 @@ func New(
 		meaningfullFilter: meaningfullFilter,
 		ai:                ai,
 		updatePeriod:      updatePeriod,
+	}
+	for _, opt := range opts {
+		opt(&out)
 	}
 
 	if err := out.reloadMessages(); err != nil {
@@ -176,8 +196,13 @@ func (g *Generator) reloadMessages() error {
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
 
+	base := g.promptBase
+	if base == "" {
+		base = systemPromptBase
+	}
+
 	systemPromptBuilder := strings.Builder{}
-	systemPromptBuilder.WriteString(systemPromptBase)
+	systemPromptBuilder.WriteString(base)
 	systemPromptBuilder.WriteString("\n<examples>")
 	for _, ex := range examples {
 		systemPromptBuilder.WriteString("\n  <example>")
