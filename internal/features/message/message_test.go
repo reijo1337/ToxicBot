@@ -643,7 +643,8 @@ func TestGenerator_ReloadMessages_ExamplesFramedAsToneNotTemplate(t *testing.T) 
 	g := &Generator{storage: storage}
 	require.NoError(t, g.reloadMessages())
 
-	intro := g.systemPrompt[:strings.Index(g.systemPrompt, "<examples>")]
+	intro, _, found := strings.Cut(g.systemPrompt, "<examples>")
+	require.True(t, found)
 	assert.Contains(t, intro, "примеры интонации")
 	assert.Contains(t, intro, "бери только тон, мат и хлёсткость, а содержание всегда из реплики")
 	assert.NotContains(t, g.systemPrompt, "Отвечать нужно в подобном формате",

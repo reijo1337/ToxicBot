@@ -33,8 +33,6 @@ type Client struct {
 	temperature float64
 }
 
-const defaultModel = "deepseek-v4-flash"
-
 func New() (*Client, error) {
 	cfg, err := parseConfig()
 	if err != nil {
@@ -49,7 +47,7 @@ func New() (*Client, error) {
 	)
 	return &Client{
 		sdk:         sdk,
-		model:       defaultModel,
+		model:       cfg.Model,
 		maxTokens:   cfg.MaxTokens,
 		temperature: cfg.Temperature,
 	}, nil

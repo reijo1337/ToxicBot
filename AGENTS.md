@@ -161,6 +161,7 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | Variable | Default | Description |
 |---|---|---|
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint override (SDK appends `/chat/completions`) |
+| `DEEPSEEK_MODEL` | `deepseek-flash` | Id модели. `deepseek-flash` — V4.1-Flash; старые `deepseek-v4-flash` и `deepseek-v4-pro` сняты 2026-09 и роутятся сюда же |
 | `DEEPSEEK_TIMEOUT` | 30s | DeepSeek request timeout |
 | `DEEPSEEK_MAX_RETRIES` | 3 | DeepSeek retry budget |
 | `DEEPSEEK_MAX_TOKENS` | 500 | Hard cap на длину ответа в токенах. Запас над целью «300 рун»: BPE-токенайзер DeepSeek для кириллицы — примерно 1-2 символа на токен, плюс модель часто эмитирует обёртку `<msg ...></msg>` поверх полезного контента. При `finish_reason: "length"` deepseek-клиент возвращает `ErrResponseTruncated`, бот фолбэчится на list-based — слишком тесный лимит шуршит логами warning'ами и режет AI-ветку. |

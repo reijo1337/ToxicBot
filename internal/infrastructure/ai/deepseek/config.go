@@ -10,6 +10,7 @@ import (
 type config struct {
 	APIKey      string        `envconfig:"DEEPSEEK_API_KEY"     required:"true"`
 	BaseURL     string        `envconfig:"DEEPSEEK_BASE_URL"                    default:"https://api.deepseek.com/v1"`
+	Model       string        `envconfig:"DEEPSEEK_MODEL"                       default:"deepseek-flash"`
 	Timeout     time.Duration `envconfig:"DEEPSEEK_TIMEOUT"                     default:"30s"`
 	MaxRetries  int           `envconfig:"DEEPSEEK_MAX_RETRIES"                 default:"3"`
 	MaxTokens   int64         `envconfig:"DEEPSEEK_MAX_TOKENS"                  default:"500"`
