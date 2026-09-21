@@ -37,6 +37,8 @@ type Params struct {
 	Concurrency int
 	// BotHistory — реплики бота в окне текстовых кейсов; фото-кейсы всегда без них, как on_photo.
 	BotHistory BotHistory
+	// Steering — call-scoped директива для текстовых кейсов (фото-кейсы несут свою).
+	Steering string
 	// Progress — куда писать прогресс; nil = тихо.
 	Progress io.Writer
 }
@@ -156,6 +158,7 @@ func runPair(
 			history = dropBotEntries(history)
 		} else {
 			history = applyBotHistory(history, p.BotHistory)
+			steering = p.Steering
 		}
 		if c.Kind == cases.KindPhoto {
 			trigger, _ := c.Trigger()
@@ -211,6 +214,8 @@ func applyBotHistory(history []chathistory.Entry, mode BotHistory) []chathistory
 			}
 		}
 		return out
+	case BotHistoryAll:
+		return history
 	default:
 		return history
 	}

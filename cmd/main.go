@@ -341,6 +341,7 @@ func main() {
 	taggerHandler, err := tagger.New(
 		ctx,
 		generator,
+		chatHistory,
 		sheetsRepository,
 		b,
 		logger,

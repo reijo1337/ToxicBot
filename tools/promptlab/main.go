@@ -162,6 +162,11 @@ func runMatrix(ctx context.Context, args []string) error {
 	kind := fs.String("kind", "", "только кейсы этого типа: text или photo")
 	noBaseline := fs.Bool("no-baseline", false, "не гонять промпт из кода")
 	examplesCount := fs.Int("examples-count", 0, "взять только первые N примеров (0 — все)")
+	steeringFile := fs.String(
+		"steering-file",
+		"",
+		"файл с директивой, добавляемой к текстовым кейсам",
+	)
 	botHistory := fs.String(
 		"bot-history", "all", "реплики бота в истории текстовых кейсов: all, none или last",
 	)
@@ -214,6 +219,16 @@ func runMatrix(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	steering := ""
+	if *steeringFile != "" {
+		raw, err := os.ReadFile(
+			*steeringFile,
+		) //nolint:gosec // путь задаёт пользователь инструмента
+		if err != nil {
+			return fmt.Errorf("прочитать %s: %w", *steeringFile, err)
+		}
+		steering = strings.TrimSpace(string(raw))
+	}
 
 	fmt.Fprintf(os.Stderr, "кейсов %d · вариантов %d · моделей %d · вызовов %d\n",
 		len(cs), len(selectedVariants), len(selectedModels),
@@ -227,6 +242,7 @@ func runMatrix(ctx context.Context, args []string) error {
 		MaxTokens:   cfg.MaxTokens,
 		Concurrency: cfg.Concurrency,
 		BotHistory:  botHistoryMode,
+		Steering:    steering,
 		Progress:    os.Stderr,
 	})
 	if err != nil {

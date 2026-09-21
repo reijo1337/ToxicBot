@@ -27,10 +27,18 @@ func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 	settings := NewMocksettingsProvider(ctrl)
 	settings.EXPECT().GetForChat(gomock.Any(), int64(100)).
 		Return(&chatsettings.Settings{AIChance: 0.5}, nil)
-	gen.EXPECT().GetMessageText(gomock.Any(), prompt, float32(0.5)).
+	history := NewMockhistoryBuffer(ctrl)
+	history.EXPECT().Get(int64(100)).Return(nil)
+	gen.EXPECT().
+		GetMessageTextWithHistoryAndSteering(gomock.Any(), nil, float32(0.5), false, gomock.Any()).
 		Return(message.GenerationResult{Message: "сосунок", Strategy: message.AiGenerationStrategy})
 
-	h := &Handler{ctx: context.Background(), generator: gen, settingsProvider: settings}
+	h := &Handler{
+		ctx:              context.Background(),
+		generator:        gen,
+		history:          history,
+		settingsProvider: settings,
+	}
 	text := h.buildTag(100, 200, "ник")
 	assert.Contains(t, text, "сосунок")
 
