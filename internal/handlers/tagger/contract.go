@@ -4,6 +4,7 @@ package tagger
 import (
 	"context"
 
+	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
@@ -14,7 +15,17 @@ type nicknameRepository interface {
 }
 
 type messageGenerator interface {
-	GetMessageText(ctx context.Context, prompt string, aiChance float32) message.GenerationResult
+	GetMessageTextWithHistoryAndSteering(
+		ctx context.Context,
+		history []chathistory.Entry,
+		aiChance float32,
+		forceAI bool,
+		steering string,
+	) message.GenerationResult
+}
+
+type historyBuffer interface {
+	Get(chatID int64) []chathistory.Entry
 }
 
 type logger interface {

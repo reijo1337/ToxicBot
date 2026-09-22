@@ -550,3 +550,103 @@ func TestSampleExamples_LargePoolSampledDistinct(t *testing.T) {
 		seen[g] = true
 	}
 }
+
+func TestGenerator_WithSystemPromptBase_ReplacesBaseKeepsExamples(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	storage := NewMockmessageRepository(ctrl)
+	storage.EXPECT().GetEnabledRandom().Return([]string{"подкол"}, nil)
+
+	g := &Generator{storage: storage}
+	WithSystemPromptBase("ВАРИАНТ")(g)
+	require.NoError(t, g.reloadMessages())
+
+	assert.Equal(t, "ВАРИАНТ\n<examples>\n  <example>подкол</example>\n</examples>", g.systemPrompt)
+}
+
+func TestGenerator_WithSystemPromptBase_EmptyKeepsDefault(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	storage := NewMockmessageRepository(ctrl)
+	storage.EXPECT().GetEnabledRandom().Return([]string{"подкол"}, nil)
+
+	g := &Generator{storage: storage}
+	WithSystemPromptBase("")(g)
+	require.NoError(t, g.reloadMessages())
+
+	assert.True(t, strings.HasPrefix(g.systemPrompt, DefaultSystemPromptBase()))
+	assert.Equal(t, systemPromptBase, DefaultSystemPromptBase())
+}
+
+// spec: GEN-030
+func TestSystemPromptBase_RequiresGroundingInTriggerMessage(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, systemPromptBase, "Зацепись за конкретику")
+	assert.Contains(t, systemPromptBase, `из реплики с now="true" или из недавней истории`)
+	assert.Contains(t, systemPromptBase, "а не оскорбление «в воздух»")
+	assert.Contains(
+		t,
+		systemPromptBase,
+		"если подменить реплику на другую, твой ответ должен перестать подходить",
+	)
+}
+
+// spec: GEN-031
+func TestSystemPromptBase_ForbidsInventingFacts(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, systemPromptBase, "Не приписывай собеседнику фактов, которых в чате нет")
+	assert.Contains(t, systemPromptBase, "Преувеличивай и доводи до абсурда то, что видно")
+}
+
+// spec: GEN-032
+func TestSystemPromptBase_LimitsFamilyJokes(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, systemPromptBase, "Родня, мать, батя — редкая приправа, не основа")
+	assert.Contains(t, systemPromptBase, "Не начинай с них и не используй их в двух ответах подряд")
+	assert.NotContains(t, systemPromptBase, "грязно шутить про его родню",
+		"старая установка, из-за которой родня была в каждом ответе, должна уйти")
+}
+
+// spec: GEN-033
+func TestSystemPromptBase_RequiresRussianOnly(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(
+		t,
+		systemPromptBase,
+		"Отвечаешь только по-русски, на каком бы языке ни была реплика",
+	)
+}
+
+// spec: GEN-034
+func TestSystemPromptBase_RequiresProfanityAsNormalSpeech(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, systemPromptBase, "Мат — твоя обычная речь")
+	assert.Contains(t, systemPromptBase, "в каждой реплике есть живой, естественный мат")
+	assert.Contains(t, systemPromptBase, "мат усиливает мысль, а не заменяет её")
+}
+
+// spec: GEN-035
+func TestGenerator_ReloadMessages_ExamplesFramedAsToneNotTemplate(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	storage := NewMockmessageRepository(ctrl)
+	storage.EXPECT().GetEnabledRandom().Return([]string{"подкол"}, nil)
+
+	g := &Generator{storage: storage}
+	require.NoError(t, g.reloadMessages())
+
+	intro, _, found := strings.Cut(g.systemPrompt, "<examples>")
+	require.True(t, found)
+	assert.Contains(t, intro, "примеры интонации")
+	assert.Contains(t, intro, "бери только тон, мат и хлёсткость, а содержание всегда из реплики")
+	assert.NotContains(t, g.systemPrompt, "Отвечать нужно в подобном формате",
+		"старая подводка подавала примеры как шаблон ответа")
+}

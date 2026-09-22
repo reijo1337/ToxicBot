@@ -7,9 +7,10 @@ scenarios:
   TAG-001: todo
   TAG-002: todo
   TAG-003: todo
-  TAG-004: todo
-  TAG-005: todo
+  TAG-004: covered
+  TAG-005: covered
   TAG-006: todo
   TAG-007: todo
   TAG-008: todo
   TAG-009: covered
+  TAG-010: covered

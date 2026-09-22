@@ -48,6 +48,7 @@ internal/
 pkg/                                     — shared utilities (logger, migrator, mapper)
 openspec/                                — living specs по capability + активные changes (см. SDD.md)
 tools/specctl/                           — гейт: связывает спеки с кодом и тестами
+tools/promptlab/                         — offline-стенд: варианты промпта × модели на кейсах из прода (см. README там)
 deploy/                                  — ansible-плейбуки деплоя (Docker): бот, Jaeger/tracing, Dozzle/логи
 ```
 
@@ -160,6 +161,7 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | Variable | Default | Description |
 |---|---|---|
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint override (SDK appends `/chat/completions`) |
+| `DEEPSEEK_MODEL` | `deepseek-flash` | Id модели. `deepseek-flash` — V4.1-Flash; старые `deepseek-v4-flash` и `deepseek-v4-pro` сняты 2026-09 и роутятся сюда же |
 | `DEEPSEEK_TIMEOUT` | 30s | DeepSeek request timeout |
 | `DEEPSEEK_MAX_RETRIES` | 3 | DeepSeek retry budget |
 | `DEEPSEEK_MAX_TOKENS` | 500 | Hard cap на длину ответа в токенах. Запас над целью «300 рун»: BPE-токенайзер DeepSeek для кириллицы — примерно 1-2 символа на токен, плюс модель часто эмитирует обёртку `<msg ...></msg>` поверх полезного контента. При `finish_reason: "length"` deepseek-клиент возвращает `ErrResponseTruncated`, бот фолбэчится на list-based — слишком тесный лимит шуршит логами warning'ами и режет AI-ветку. |
@@ -224,6 +226,7 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 | `make spec-cover cap=<имя>` | Сценарии одной capability со статусами |
 | `make spec-archive name=<id>` | Влить дельту в living specs и заархивировать change |
 | `make test` | `go test ./...` |
+| `make promptlab-fetch host=<ip>` / `promptlab-extract` / `promptlab-run` | Стенд сравнения промптов и моделей на реальных кейсах из прод-базы; данные в `tools/promptlab/data/` (gitignore). Ключи — `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` |
 | `make release-patch` / `release-minor` / `release-major` | Создать и запушить новый семвер-тег (триггерит pipeline `Труба`). Только с master, чистого working tree, синхронизированного с origin. Спрашивает `[y/N]` перед push'ем. |
 
 Тесты: `make test` или `go test ./...`.

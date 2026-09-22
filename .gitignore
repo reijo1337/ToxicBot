@@ -20,3 +20,6 @@ docs/superpowers/
 
 # завершённые changes: дельта влита в openspec/specs, остальное живёт в истории коммитов
 openspec/changes/archive/
+
+# promptlab: копия прод-базы, кейсы из переписки и отчёты — только локально
+tools/promptlab/data/

@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	chathistory "github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	chatsettings "github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	message "github.com/reijo1337/ToxicBot/internal/features/message"
 	stats "github.com/reijo1337/ToxicBot/internal/features/stats"
@@ -82,18 +83,56 @@ func (m *MockmessageGenerator) EXPECT() *MockmessageGeneratorMockRecorder {
 	return m.recorder
 }
 
-// GetMessageText mocks base method.
-func (m *MockmessageGenerator) GetMessageText(ctx context.Context, prompt string, aiChance float32) message.GenerationResult {
+// GetMessageTextWithHistoryAndSteering mocks base method.
+func (m *MockmessageGenerator) GetMessageTextWithHistoryAndSteering(ctx context.Context, history []chathistory.Entry, aiChance float32, forceAI bool, steering string) message.GenerationResult {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMessageText", ctx, prompt, aiChance)
+	ret := m.ctrl.Call(m, "GetMessageTextWithHistoryAndSteering", ctx, history, aiChance, forceAI, steering)
 	ret0, _ := ret[0].(message.GenerationResult)
 	return ret0
 }
 
-// GetMessageText indicates an expected call of GetMessageText.
-func (mr *MockmessageGeneratorMockRecorder) GetMessageText(ctx, prompt, aiChance any) *gomock.Call {
+// GetMessageTextWithHistoryAndSteering indicates an expected call of GetMessageTextWithHistoryAndSteering.
+func (mr *MockmessageGeneratorMockRecorder) GetMessageTextWithHistoryAndSteering(ctx, history, aiChance, forceAI, steering any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageText", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageText), ctx, prompt, aiChance)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextWithHistoryAndSteering", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextWithHistoryAndSteering), ctx, history, aiChance, forceAI, steering)
+}
+
+// MockhistoryBuffer is a mock of historyBuffer interface.
+type MockhistoryBuffer struct {
+	ctrl     *gomock.Controller
+	recorder *MockhistoryBufferMockRecorder
+	isgomock struct{}
+}
+
+// MockhistoryBufferMockRecorder is the mock recorder for MockhistoryBuffer.
+type MockhistoryBufferMockRecorder struct {
+	mock *MockhistoryBuffer
+}
+
+// NewMockhistoryBuffer creates a new mock instance.
+func NewMockhistoryBuffer(ctrl *gomock.Controller) *MockhistoryBuffer {
+	mock := &MockhistoryBuffer{ctrl: ctrl}
+	mock.recorder = &MockhistoryBufferMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockhistoryBuffer) EXPECT() *MockhistoryBufferMockRecorder {
+	return m.recorder
+}
+
+// Get mocks base method.
+func (m *MockhistoryBuffer) Get(chatID int64) []chathistory.Entry {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", chatID)
+	ret0, _ := ret[0].([]chathistory.Entry)
+	return ret0
+}
+
+// Get indicates an expected call of Get.
+func (mr *MockhistoryBufferMockRecorder) Get(chatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockhistoryBuffer)(nil).Get), chatID)
 }
 
 // Mocklogger is a mock of logger interface.

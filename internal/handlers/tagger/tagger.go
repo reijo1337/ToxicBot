@@ -5,16 +5,29 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
+	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
 
-const prompt = "Придумай внезапное оскорбление для участника чата"
+// Указание для тега по таймеру: повода нет, бот сам заводит разговор по недавней
+// истории; обращение по кличке ставит тегер, поэтому модели велено его не дублировать.
+const tagSteering = `Дополнительные правила именно для этой реплики:
+- Сейчас никто ничего не писал. Реплика с now="true" — просто последнее, что было в чате; на неё напрямую не отвечай.
+- Ты сам, без повода, обращаешься к участнику, которого в чате зовут «%s», и докапываешься до него. Отталкивайся от того, что недавно обсуждали в чате, или от того, что он отмалчивается.
+- Не начинай реплику с обращения по кличке или имени — обращение уже стоит перед твоей репликой.`
+
+func buildTagSteering(nickname string) string {
+	return fmt.Sprintf(tagSteering, message.SanitizeText(nickname, 64))
+}
 
 type chat string
 
@@ -25,6 +38,7 @@ func (c chat) Recipient() string {
 type Handler struct {
 	ctx                context.Context
 	generator          messageGenerator
+	history            historyBuffer
 	log                logger
 	random             randomizer
 	nicknameRepository nicknameRepository
@@ -44,6 +58,7 @@ type Handler struct {
 func New(
 	ctx context.Context,
 	generator messageGenerator,
+	history historyBuffer,
 	nicknameRepository nicknameRepository,
 	bot *telebot.Bot,
 	log logger,
@@ -59,6 +74,7 @@ func New(
 	out := &Handler{
 		ctx:                ctx,
 		generator:          generator,
+		history:            history,
 		bot:                bot,
 		nicknameRepository: nicknameRepository,
 		log:                log,
@@ -193,10 +209,39 @@ func (h *Handler) buildTag(chatID, user int64, nickname string) string {
 		aiChance = s.AIChance
 	}
 
-	genResult := h.generator.GetMessageText(ctx, prompt, aiChance)
+	genResult := h.generator.GetMessageTextWithHistoryAndSteering(
+		ctx,
+		h.history.Get(chatID),
+		aiChance,
+		false,
+		buildTagSteering(nickname),
+	)
 	span.SetAttributes(tracing.ContentAttr("output", genResult.Message))
 
-	return fmt.Sprintf("[%s](tg://user?id=%d), %s", nickname, user, genResult.Message)
+	text := stripLeadingNickname(genResult.Message, nickname)
+	return fmt.Sprintf("[%s](tg://user?id=%d), %s", nickname, user, text)
+}
+
+// stripLeadingNickname: модель начинает реплику с клички вопреки указанию, а
+// упоминание ставит тегер — без зачистки выходит «[Валера](…), Валера, …».
+func stripLeadingNickname(text, nickname string) string {
+	trimmed := strings.TrimSpace(text)
+	if nickname == "" || len(trimmed) < len(nickname) ||
+		!strings.EqualFold(trimmed[:len(nickname)], nickname) {
+		return text
+	}
+	after := trimmed[len(nickname):]
+	if next, _ := utf8.DecodeRuneInString(after); unicode.IsLetter(next) || unicode.IsDigit(next) {
+		return text // кличка — лишь начало другого слова
+	}
+	rest := strings.TrimLeftFunc(after, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsPunct(r) || r == '—'
+	})
+	if rest == "" {
+		return text
+	}
+	first, size := utf8.DecodeRuneInString(rest)
+	return string(unicode.ToUpper(first)) + rest[size:]
 }
 
 func (h *Handler) updateNicknames() error {
