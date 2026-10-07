@@ -18,15 +18,21 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-// Указание для тега по таймеру: повода нет, бот сам заводит разговор по недавней
-// истории; обращение по кличке ставит тегер, поэтому модели велено его не дублировать.
+// Кличка выбирается случайно и не идентифицирует автора в истории.
 const tagSteering = `Дополнительные правила именно для этой реплики:
-- Сейчас никто ничего не писал. Реплика с now="true" — просто последнее, что было в чате; на неё напрямую не отвечай.
-- Ты сам, без повода, обращаешься к участнику, которого в чате зовут «%s», и докапываешься до него. Отталкивайся от того, что недавно обсуждали в чате, или от того, что он отмалчивается.
+- Это пинг по таймеру. Сейчас никто ничего не писал; вся история — только контекст, на неё напрямую не отвечай. Правила ответа на последнюю реплику здесь не применяются.
+- Ты сам обращаешься к участнику с подписью «%s» в атрибуте from истории. Именно он — адресат этой реплики.
+- «%s» — случайное обращение перед твоей репликой, а не настоящее имя участника и не подпись автора в истории. Не ищи адресата по этой кличке.
+- Не приписывай адресату слова и поступки других участников. Его собственные реплики определяй только по его подписи from. Если его реплик в истории нет или авторство неоднозначно, используй общую тему, не утверждая, что он что-то сказал или сделал.
+- Отталкивайся от того, что недавно обсуждали в чате, или от того, что адресат отмалчивается.
 - Не начинай реплику с обращения по кличке или имени — обращение уже стоит перед твоей репликой.`
 
-func buildTagSteering(nickname string) string {
-	return fmt.Sprintf(tagSteering, message.SanitizeText(nickname, 64))
+func buildTagSteering(author, nickname string) string {
+	return fmt.Sprintf(
+		tagSteering,
+		message.SanitizeText(author, 64),
+		message.SanitizeText(nickname, 64),
+	)
 }
 
 type chat string
@@ -47,7 +53,7 @@ type Handler struct {
 	chatToUsers        map[string][]int64
 	queue              *taggerQueue
 	bot                *telebot.Bot
-	uniqueUsers        map[string]struct{}
+	uniqueUsers        map[string]string
 	nicknames          []string
 	nextFromNano       int64
 	nextInterval       int64
@@ -82,7 +88,7 @@ func New(
 		settingsProvider:   settingsProvider,
 		queue:              &taggerQueue{queue: make([]taggerJob, 0, 10)},
 		chatToUsers:        make(map[string][]int64, 10),
-		uniqueUsers:        make(map[string]struct{}, 2_000),
+		uniqueUsers:        make(map[string]string, 2_000),
 		nextFromNano:       nextFrom.Nanoseconds(),
 		nextInterval:       nextTo.Nanoseconds() - nextFrom.Nanoseconds() + 1,
 		random:             random,
@@ -163,9 +169,9 @@ func (h *Handler) sender(ctx context.Context) {
 		index := h.random.Intn(len(users))
 		user := users[index]
 
+		h.mu.Unlock()
 		chatIDint, _ := strconv.ParseInt(task.chatID, 10, 64)
 		text := h.buildTag(chatIDint, user, nickname)
-		h.mu.Unlock()
 
 		go h.statIncer.Inc(h.ctx, chatIDint, user, stats.PersonalOperationType)
 
@@ -209,12 +215,18 @@ func (h *Handler) buildTag(chatID, user int64, nickname string) string {
 		aiChance = s.AIChance
 	}
 
-	genResult := h.generator.GetMessageTextWithHistoryAndSteering(
+	h.mu.Lock()
+	author := h.uniqueUsers[fmt.Sprintf("%d:%d", chatID, user)]
+	h.mu.Unlock()
+	if author == "" {
+		author = message.SanitizeAuthor("", "", user, false)
+	}
+
+	genResult := h.generator.GetMessageTextForTag(
 		ctx,
 		h.history.Get(chatID),
 		aiChance,
-		false,
-		buildTagSteering(nickname),
+		buildTagSteering(author, nickname),
 	)
 	span.SetAttributes(tracing.ContentAttr("output", genResult.Message))
 
@@ -293,11 +305,11 @@ func (h *Handler) addChatInfo(chat string, user *telebot.User) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if _, notUnique := h.uniqueUsers[key]; notUnique {
+	_, notUnique := h.uniqueUsers[key]
+	h.uniqueUsers[key] = message.SanitizeAuthor(user.Username, user.FirstName, user.ID, user.IsBot)
+	if notUnique {
 		return
 	}
-
-	h.uniqueUsers[key] = struct{}{}
 
 	h.chatToUsers[chat] = append(h.chatToUsers[chat], user.ID)
 

@@ -30,7 +30,7 @@ func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 	history := NewMockhistoryBuffer(ctrl)
 	history.EXPECT().Get(int64(100)).Return(nil)
 	gen.EXPECT().
-		GetMessageTextWithHistoryAndSteering(gomock.Any(), nil, float32(0.5), false, gomock.Any()).
+		GetMessageTextForTag(gomock.Any(), nil, float32(0.5), gomock.Any()).
 		Return(message.GenerationResult{Message: "сосунок", Strategy: message.AiGenerationStrategy})
 
 	h := &Handler{

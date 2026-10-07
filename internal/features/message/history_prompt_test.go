@@ -131,7 +131,7 @@ func TestBuildChatCompletions_OnlyLastUserMarkedNow(t *testing.T) {
 		{ID: 1, Time: t1, Author: "@alice", Text: "first", FromBot: false},
 		{ID: 2, Time: t1.Add(time.Minute), Author: "@bob", Text: "second", FromBot: false},
 	}
-	msgs := buildChatCompletions("S", history)
+	msgs := buildChatCompletions("S", history, replyGeneration)
 	require.Len(t, msgs, 3)
 	assert.NotContains(t, msgs[1].Content, `now="true"`, "earlier message must not be marked")
 	assert.Contains(t, msgs[2].Content, `now="true"`, "the most recent user message must be marked")
@@ -148,7 +148,7 @@ func TestBuildChatCompletions_AssemblyOrderAndSystem(t *testing.T) {
 		{ID: 2, Time: t2, Author: "@bob", Text: "yo", ReplyToID: 1, FromBot: false},
 	}
 
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 	require.Len(t, msgs, 3)
 
 	assert.Equal(t, RoleSystem, msgs[0].Role)
@@ -181,7 +181,7 @@ func TestBuildChatCompletions_BotEntrySanitizedToAssistant(t *testing.T) {
 		{ID: 3, Time: t3, Author: "@alice", Text: "fuck off", FromBot: false},
 	}
 
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 	require.Len(t, msgs, 4)
 
 	assert.Equal(t, RoleAssistant, msgs[2].Role)
@@ -219,7 +219,7 @@ func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 		},
 	}
 
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 	require.Len(t, msgs, 4)
 
 	assert.Equal(t, RoleUser, msgs[1].Role)
@@ -246,7 +246,7 @@ func TestBuildChatCompletions_SingleUser(t *testing.T) {
 	history := []chathistory.Entry{
 		{ID: 7, Time: t1, Author: "@solo", Text: "yo"},
 	}
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 	require.Len(t, msgs, 2)
 	assert.Equal(t, RoleSystem, msgs[0].Role)
 	assert.Equal(t, RoleUser, msgs[1].Role)
@@ -274,7 +274,7 @@ func TestBuildChatCompletions_OutOfOrderEntriesSortedByTime(t *testing.T) {
 		{ID: 2, Time: t2, Author: "@bob", Text: "second", FromBot: false},
 	}
 
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 	require.Len(t, msgs, 4)
 
 	assert.Equal(t, `<msg from="@alice" time="2026-05-01T10:00">first</msg>`, msgs[1].Content)
@@ -299,7 +299,7 @@ func TestBuildChatCompletions_SameSecondTieBrokenByID(t *testing.T) {
 		{ID: 11, Time: ts, Author: "@alice", Text: "earlier", FromBot: false},
 	}
 
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 	require.Len(t, msgs, 3)
 
 	assert.Contains(t, msgs[1].Content, "earlier")
@@ -322,7 +322,7 @@ func TestBuildChatCompletions_LeadingAssistantsAreSkipped(t *testing.T) {
 		},
 		{ID: 3, Time: t1.Add(2 * time.Minute), Author: "@alice", Text: "hello", FromBot: false},
 	}
-	msgs := buildChatCompletions(system, history)
+	msgs := buildChatCompletions(system, history, replyGeneration)
 
 	require.Len(t, msgs, 2, "leading assistant entries must be skipped, leaving system + user")
 	assert.Equal(t, RoleSystem, msgs[0].Role)
