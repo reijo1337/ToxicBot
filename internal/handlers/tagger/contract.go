@@ -15,11 +15,10 @@ type nicknameRepository interface {
 }
 
 type messageGenerator interface {
-	GetMessageTextWithHistoryAndSteering(
+	GetMessageTextForTag(
 		ctx context.Context,
 		history []chathistory.Entry,
 		aiChance float32,
-		forceAI bool,
 		steering string,
 	) message.GenerationResult
 }

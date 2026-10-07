@@ -86,6 +86,7 @@ func sanitizeAttr(s string) string {
 func buildChatCompletions(
 	system string,
 	history []chathistory.Entry,
+	mode generationMode,
 ) []LLMMessage {
 	// The buffer preserves Add/AddAll insertion order, which diverges from
 	// chronological order: telebot processes updates concurrently and the bulling
@@ -101,12 +102,14 @@ func buildChatCompletions(
 		return sorted[i].ID < sorted[j].ID
 	})
 
-	// Самая поздняя user-реплика — та, на которую бот отвечает; остальное контекст.
+	// В ответе последняя user-реплика — триггер; при пинге вся история — контекст.
 	triggerIdx := -1
-	for i := len(sorted) - 1; i >= 0; i-- {
-		if !sorted[i].FromBot {
-			triggerIdx = i
-			break
+	if mode == replyGeneration {
+		for i := len(sorted) - 1; i >= 0; i-- {
+			if !sorted[i].FromBot {
+				triggerIdx = i
+				break
+			}
 		}
 	}
 
