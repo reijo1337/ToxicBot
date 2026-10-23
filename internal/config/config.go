@@ -24,7 +24,7 @@ type Config struct {
 	StickerReactChance           float32       `envconfig:"STICKER_REACTIONS_CHANCE"                            default:"0.4"`
 	BullingsAIChance             float32       `envconfig:"BULLINGS_AI_CHANCE"                                  default:"0.75"`
 	VoiceReactChance             float32       `envconfig:"VOICE_REACTIONS_CHANCE"                              default:"0.8"`
-	PhotoReactChance             float32       `envconfig:"PHOTO_REACTIONS_CHANCE"                              default:"0.75"`
+	PhotoReactChance             float32       `envconfig:"PHOTO_REACTIONS_CHANCE"                              default:"1"`
 	NicknamesUpdatePerios        time.Duration `envconfig:"NICKNAMES_UPDATE_PERIOD"                             default:"10m"`
 	SqliteFilePath               string        `envconfig:"SQLITE_FILE_PATH"                    required:"true"`
 }

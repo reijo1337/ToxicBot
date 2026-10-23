@@ -2,6 +2,7 @@ package settings
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -31,19 +32,20 @@ func New(provider settingsProvider, defaults chatsettings.Defaults) *Handler {
 }
 
 func (h *Handler) Handle(ctx telebot.Context) error {
+	message := ctx.Message()
 	tgChat := ctx.Chat()
-	sender := ctx.Sender()
 
-	if tgChat == nil || sender == nil {
+	if message == nil || tgChat == nil {
 		return nil
 	}
 
-	if tgChat.Type == telebot.ChatPrivate {
-		return ctx.Reply("Иди в группу, тут тебе не личный кабинет психотерапевта.")
+	allowed, err := canManageSettings(ctx, tgChat, message)
+	if err != nil || !allowed {
+		return err
 	}
 
 	// Разбираем команду: /settings [key [value]]
-	text := ctx.Message().Text
+	text := message.Text
 	parts := strings.Fields(text)
 	// parts[0] == "/settings"
 
@@ -60,6 +62,61 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 	default:
 		return ctx.Reply(h.usage())
 	}
+}
+
+func canManageSettings(
+	ctx telebot.Context,
+	tgChat *telebot.Chat,
+	message *telebot.Message,
+) (bool, error) {
+	if tgChat.Type == telebot.ChatPrivate {
+		return false, ctx.Reply("Иди в группу, тут тебе не личный кабинет психотерапевта.")
+	}
+	if tgChat.Type != telebot.ChatGroup && tgChat.Type != telebot.ChatSuperGroup {
+		return false, ctx.Reply("Команда доступна только в группе.")
+	}
+
+	if message.SenderChat != nil {
+		if tgChat.Type == telebot.ChatSuperGroup && message.SenderChat.ID == tgChat.ID {
+			return true, nil
+		}
+		return false, ctx.Reply(
+			"Вызови команду как администратор от своего аккаунта или от имени этой группы.",
+		)
+	}
+
+	sender := ctx.Sender()
+	if sender == nil {
+		return false, nil
+	}
+
+	member, err := ctx.Bot().ChatMemberOf(tgChat, sender)
+	if err != nil {
+		return false, verificationFailed(ctx, err)
+	}
+	if member == nil {
+		return false, verificationFailed(ctx, errors.New("empty chat member"))
+	}
+
+	switch member.Role {
+	case telebot.Creator, telebot.Administrator:
+		return true, nil
+	case telebot.Member, telebot.Restricted, telebot.Left, telebot.Kicked:
+		return false, ctx.Reply("Настройки чата доступны только администраторам.")
+	default:
+		return false, verificationFailed(
+			ctx,
+			fmt.Errorf("unknown chat member role %q", member.Role),
+		)
+	}
+}
+
+// verificationFailed отказывает в команде и возвращает причину, чтобы она попала в лог.
+func verificationFailed(ctx telebot.Context, cause error) error {
+	return errors.Join(
+		fmt.Errorf("check chat administrator: %w", cause),
+		ctx.Reply("Не удалось проверить права. Попробуй ещё раз позже."),
+	)
 }
 
 func (h *Handler) handleShow(ctx telebot.Context, chatID int64) error {
@@ -132,34 +189,32 @@ func (h *Handler) handleSet(ctx telebot.Context, chatID int64, key, rawValue str
 		if f, ok := parseChance(rawValue); ok {
 			partial.StickerReactChance = &f
 		} else {
-			errMsg = "Вероятность — это число от 0 до 1, гений. Не \"" + rawValue + "\". Попробуй ещё раз, может в этот раз получится"
+			errMsg = "Вероятность — это число от 0 до 1, гений. Не \"" + rawValue + "\". Попробуй ещё раз, может в этот раз получится. Пример: 0.4"
 		}
 
 	case "voice_chance":
 		if f, ok := parseChance(rawValue); ok {
 			partial.VoiceReactChance = &f
 		} else {
-			errMsg = "Число от 0.0 до 1.0, обезьяна. \"" + rawValue + "\" — это не число, это позор"
+			errMsg = "Число от 0.0 до 1.0, обезьяна. \"" + rawValue + "\" — это не число, это позор. Пример: 0.8"
 		}
 
 	case "ai_chance":
 		if f, ok := parseChance(rawValue); ok {
 			partial.AIChance = &f
 		} else {
-			errMsg = "Даже ИИ за тебя стыдно. Введи число от 0.0 до 1.0, а не \"" + rawValue + "\""
+			errMsg = "Даже ИИ за тебя стыдно. Введи число от 0.0 до 1.0, а не \"" + rawValue + "\". Пример: 0.75"
 		}
 
 	case "photo_chance":
 		if f, ok := parseChance(rawValue); ok {
 			partial.PhotoReactChance = &f
 		} else {
-			errMsg = "Фоточки тоже считать не умеешь? Число от 0.0 до 1.0, давай заново"
+			errMsg = "Фоточки тоже считать не умеешь? Число от 0.0 до 1.0, давай заново. Пример: 0.5"
 		}
 
 	default:
-		return ctx.Reply(
-			"Такой настройки не существует, балбес. Попробуй /settings без параметров, если забыл как пользоваться.",
-		)
+		return ctx.Reply("Такой настройки не существует, балбес.\n\n" + h.usage())
 	}
 
 	if errMsg != "" {
