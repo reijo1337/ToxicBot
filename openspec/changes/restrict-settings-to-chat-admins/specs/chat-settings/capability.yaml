@@ -1,0 +1,28 @@
+# План покрытия дельты, а не отчёт о существующих тестах.
+# covered — целевой статус после реализации и добавления якорей.
+# При archive объединить эти записи с living capability.yaml, сохранив остальные сценарии.
+prefix: SET
+
+owns:
+  - internal/features/chatsettings
+  - internal/domain/chat
+  - internal/handlers/settings
+  - internal/infrastructure/storage/db/chat_settings.go
+
+scenarios:
+  SET-005: covered
+  SET-006: covered
+  SET-007: covered
+  SET-008: covered
+  SET-009: covered
+  SET-010: covered
+  SET-013: covered
+  SET-014: covered
+  SET-015: covered
+  SET-016: covered
+  SET-017: covered
+  SET-018: covered
+  SET-019: covered
+  SET-020: covered
+  SET-021: covered
+  SET-022: covered

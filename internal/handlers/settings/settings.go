@@ -2,6 +2,7 @@ package settings
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -31,19 +32,20 @@ func New(provider settingsProvider, defaults chatsettings.Defaults) *Handler {
 }
 
 func (h *Handler) Handle(ctx telebot.Context) error {
+	message := ctx.Message()
 	tgChat := ctx.Chat()
-	sender := ctx.Sender()
 
-	if tgChat == nil || sender == nil {
+	if message == nil || tgChat == nil {
 		return nil
 	}
 
-	if tgChat.Type == telebot.ChatPrivate {
-		return ctx.Reply("Иди в группу, тут тебе не личный кабинет психотерапевта.")
+	allowed, err := canManageSettings(ctx, tgChat, message)
+	if err != nil || !allowed {
+		return err
 	}
 
 	// Разбираем команду: /settings [key [value]]
-	text := ctx.Message().Text
+	text := message.Text
 	parts := strings.Fields(text)
 	// parts[0] == "/settings"
 
@@ -59,6 +61,54 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		return h.handleSet(ctx, tgChat.ID, parts[1], parts[2])
 	default:
 		return ctx.Reply(h.usage())
+	}
+}
+
+func canManageSettings(
+	ctx telebot.Context,
+	tgChat *telebot.Chat,
+	message *telebot.Message,
+) (bool, error) {
+	if tgChat.Type == telebot.ChatPrivate {
+		return false, ctx.Reply("Иди в группу, тут тебе не личный кабинет психотерапевта.")
+	}
+	if tgChat.Type != telebot.ChatGroup && tgChat.Type != telebot.ChatSuperGroup {
+		return false, ctx.Reply("Команда доступна только в группе.")
+	}
+
+	if message.SenderChat != nil {
+		if tgChat.Type == telebot.ChatSuperGroup && message.SenderChat.ID == tgChat.ID {
+			return true, nil
+		}
+		return false, ctx.Reply(
+			"Вызови команду как администратор от своего аккаунта или от имени этой группы.",
+		)
+	}
+
+	sender := ctx.Sender()
+	if sender == nil {
+		return false, nil
+	}
+
+	const verificationFailed = "Не удалось проверить права. Попробуй ещё раз позже."
+	member, err := ctx.Bot().ChatMemberOf(tgChat, sender)
+	if err != nil {
+		return false, errors.Join(
+			fmt.Errorf("check chat administrator: %w", err),
+			ctx.Reply(verificationFailed),
+		)
+	}
+	if member == nil {
+		return false, ctx.Reply(verificationFailed)
+	}
+
+	switch member.Role {
+	case telebot.Creator, telebot.Administrator:
+		return true, nil
+	case telebot.Member, telebot.Restricted, telebot.Left, telebot.Kicked:
+		return false, ctx.Reply("Настройки чата доступны только администраторам.")
+	default:
+		return false, ctx.Reply(verificationFailed)
 	}
 }
 
