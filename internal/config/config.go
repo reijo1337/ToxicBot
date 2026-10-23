@@ -8,6 +8,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
+const defaultPhotoReactChance = 1
+
 type Config struct {
 	TelegramToken                string        `envconfig:"TELEGRAM_TOKEN"                      required:"true"`
 	StickerSets                  []string      `envconfig:"STICKER_SETS"                                        default:"static_bulling_by_stickersthiefbot"`
@@ -24,13 +26,13 @@ type Config struct {
 	StickerReactChance           float32       `envconfig:"STICKER_REACTIONS_CHANCE"                            default:"0.4"`
 	BullingsAIChance             float32       `envconfig:"BULLINGS_AI_CHANCE"                                  default:"0.75"`
 	VoiceReactChance             float32       `envconfig:"VOICE_REACTIONS_CHANCE"                              default:"0.8"`
-	PhotoReactChance             float32       `envconfig:"PHOTO_REACTIONS_CHANCE"                              default:"0.75"`
+	PhotoReactChance             float32       `envconfig:"PHOTO_REACTIONS_CHANCE"`
 	NicknamesUpdatePerios        time.Duration `envconfig:"NICKNAMES_UPDATE_PERIOD"                             default:"10m"`
 	SqliteFilePath               string        `envconfig:"SQLITE_FILE_PATH"                    required:"true"`
 }
 
 func Parse() (*Config, error) {
-	var out Config
+	out := Config{PhotoReactChance: defaultPhotoReactChance}
 	if err := envconfig.Process("", &out); err != nil {
 		if err = envconfig.Usage("", &out); err != nil {
 			return nil, fmt.Errorf("can't parse config: %w", err)
