@@ -1,7 +1,7 @@
 package tagger
 
 import (
-	"fmt"
+	"errors"
 
 	"gopkg.in/telebot.v3"
 )
@@ -29,48 +29,17 @@ func (h *OnLeftHandler) Handle(ctx telebot.Context) error {
 
 	left := message.UserLeft
 
-	// нас удалили из чата =(
+	// нас удалили из чата =( — инициатора обратно не добавляем
 	if h.bot.Me.ID == left.ID {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-
-		users := h.chatToUsers[chat.Recipient()]
-		delete(h.chatToUsers, chat.Recipient())
-
-		for _, userID := range users {
-			key := fmt.Sprintf("%s:%d", chat.Recipient(), userID)
-			delete(h.uniqueUsers, key)
-		}
-
-		return nil
+		return h.forgetChat(h.ctx, chat.ID)
 	}
 
-	// кого-то хлопнули - чистим инфу
-	h.mu.Lock()
-	users := h.chatToUsers[chat.Recipient()]
-
-	if len(users) != 0 {
-		i := 0
-		for ; i < len(users); i++ {
-			if users[i] == left.ID {
-				break
-			}
-		}
-
-		if i != len(users) {
-			users[len(users)-1], users[i] = users[i], users[len(users)-1]
-			h.chatToUsers[chat.Recipient()] = users[:len(users)-1]
-		}
-
-		key := fmt.Sprintf("%s:%d", chat.Recipient(), left.ID)
-		delete(h.uniqueUsers, key)
-	}
-	h.mu.Unlock()
+	err := h.removeUser(h.ctx, chat.ID, left.ID)
 
 	// кто-то удалил или сам?
 	if sender != nil && sender.ID != left.ID {
-		h.addChatInfo(chat.Recipient(), sender)
+		err = errors.Join(err, h.observe(h.ctx, chat, sender))
 	}
 
-	return nil
+	return err
 }

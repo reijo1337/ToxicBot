@@ -2,18 +2,38 @@ prefix: TAG
 
 owns:
   - internal/handlers/tagger
+  - internal/features/taggerusers
+  - internal/domain/chat/tagger_user.go
+  - internal/infrastructure/storage/db/tagger_users.go
+  - db/migrations/000006_add-tagger-users-and-toggle.up.sql
+  - db/migrations/000006_add-tagger-users-and-toggle.down.sql
 
 scenarios:
-  TAG-001: todo
-  TAG-002: todo
-  TAG-003: todo
+  TAG-001: covered
+  TAG-002: covered
+  TAG-003: covered
   TAG-004: covered
   TAG-005: covered
   TAG-006: todo
-  TAG-007: todo
-  TAG-008: todo
+  TAG-007: covered
+  TAG-008: covered
   TAG-009: covered
   TAG-010: covered
   TAG-011: covered
   TAG-012: covered
   TAG-013: covered
+  TAG-014: covered
+  TAG-015: covered
+  TAG-016: covered
+  TAG-017: covered
+  TAG-018: covered
+  TAG-019: covered
+  TAG-020: covered
+  TAG-021: covered
+  TAG-022: covered
+  TAG-023: covered
+  TAG-024: covered
+  TAG-025: covered
+  TAG-026: covered
+  TAG-027: covered
+  TAG-028: covered

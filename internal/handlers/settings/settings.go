@@ -133,7 +133,8 @@ func (h *Handler) handleShow(ctx telebot.Context, chatID int64) error {
 			"• sticker_chance: %.2f (по умолчанию: %.2f)\n"+
 			"• voice_chance: %.2f (по умолчанию: %.2f)\n"+
 			"• ai_chance: %.2f (по умолчанию: %.2f)\n"+
-			"• photo_chance: %.2f (по умолчанию: %.2f)\n\n"+
+			"• photo_chance: %.2f (по умолчанию: %.2f)\n"+
+			"• tagger: %s (по умолчанию: %s)\n\n"+
 			"Изменить: /settings <ключ> <значение>\n"+
 			"Сбросить: /settings reset",
 		s.ThresholdCount, h.defaults.ThresholdCount,
@@ -143,6 +144,7 @@ func (h *Handler) handleShow(ctx telebot.Context, chatID int64) error {
 		s.VoiceReactChance, h.defaults.VoiceReactChance,
 		s.AIChance, h.defaults.AIChance,
 		s.PhotoReactChance, h.defaults.PhotoReactChance,
+		onOff(s.TaggerEnabled), onOff(h.defaults.TaggerEnabled),
 	)
 
 	return ctx.Reply(msg)
@@ -213,6 +215,13 @@ func (h *Handler) handleSet(ctx telebot.Context, chatID int64, key, rawValue str
 			errMsg = "Фоточки тоже считать не умеешь? Число от 0.0 до 1.0, давай заново. Пример: 0.5"
 		}
 
+	case "tagger":
+		if v, ok := parseOnOff(rawValue); ok {
+			partial.TaggerEnabled = &v
+		} else {
+			errMsg = "Тут всего два варианта, и ты умудрился промахнуться. on или off. Пример: /settings tagger off"
+		}
+
 	default:
 		return ctx.Reply("Такой настройки не существует, балбес.\n\n" + h.usage())
 	}
@@ -238,6 +247,24 @@ func parseChance(raw string) (float32, bool) {
 	return float32(v), true
 }
 
+func parseOnOff(raw string) (bool, bool) {
+	switch raw {
+	case "on":
+		return true, true
+	case "off":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func onOff(v bool) string {
+	if v {
+		return "on"
+	}
+	return "off"
+}
+
 func (h *Handler) usage() string {
 	return "Использование:\n" +
 		"/settings — показать настройки\n" +
@@ -250,5 +277,6 @@ func (h *Handler) usage() string {
 		"• sticker_chance (0.0 – 1.0)\n" +
 		"• voice_chance (0.0 – 1.0)\n" +
 		"• ai_chance (0.0 – 1.0)\n" +
-		"• photo_chance (0.0 – 1.0)"
+		"• photo_chance (0.0 – 1.0)\n" +
+		"• tagger (on / off)"
 }

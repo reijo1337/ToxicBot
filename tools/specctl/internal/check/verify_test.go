@@ -39,7 +39,7 @@ func TestVerify_CoveredWithoutAnchor(t *testing.T) {
 		photoCapability(map[string]spec.Coverage{photoOne: spec.CoverageCovered}),
 	}
 
-	got := Verify(caps, nil)
+	got := Verify(caps, nil, nil)
 	require.Len(t, got, 1)
 	assert.Equal(t, SeverityFail, got[0].Severity)
 	assert.Contains(t, got[0].Message, photoOne)
@@ -54,7 +54,7 @@ func TestVerify_CoveredWithAnchor(t *testing.T) {
 	}
 	found := []anchors.Anchor{{ScenarioID: photoOne, TestName: "TestX", File: "x_test.go"}}
 
-	assert.Empty(t, Verify(caps, found))
+	assert.Empty(t, Verify(caps, found, nil))
 }
 
 func TestVerify_AnchorToUnknownScenario(t *testing.T) {
@@ -68,12 +68,29 @@ func TestVerify_AnchorToUnknownScenario(t *testing.T) {
 		{ScenarioID: "PHOTO-404", TestName: "TestGhost", File: "g_test.go", Line: 12},
 	}
 
-	got := Verify(caps, found)
+	got := Verify(caps, found, nil)
 	require.Len(t, got, 1)
 	assert.Equal(t, SeverityFail, got[0].Severity)
 	assert.Contains(t, got[0].Message, "PHOTO-404")
 	assert.Contains(t, got[0].Message, "не существует")
 	assert.Equal(t, "g_test.go:12", got[0].Location)
+}
+
+func TestVerify_AnchorToPendingDeltaScenario(t *testing.T) {
+	t.Parallel()
+
+	caps := []spec.Capability{
+		photoCapability(map[string]spec.Coverage{photoOne: spec.CoverageCovered}),
+	}
+	found := []anchors.Anchor{
+		{ScenarioID: photoOne, TestName: "TestX", File: "x_test.go"},
+		{ScenarioID: "PHOTO-002", TestName: "TestNew", File: "n_test.go", Line: 3},
+		{ScenarioID: "PHOTO-404", TestName: "TestGhost", File: "g_test.go", Line: 12},
+	}
+
+	got := Verify(caps, found, map[string]struct{}{"PHOTO-002": {}})
+	require.Len(t, got, 1, "якорь на сценарий из дельты не висячий, на выдуманный — висячий")
+	assert.Contains(t, got[0].Message, "PHOTO-404")
 }
 
 func TestVerify_ManualAndTodoNeedNoAnchor(t *testing.T) {
@@ -86,7 +103,7 @@ func TestVerify_ManualAndTodoNeedNoAnchor(t *testing.T) {
 		}),
 	}
 
-	assert.Empty(t, Verify(caps, nil))
+	assert.Empty(t, Verify(caps, nil, nil))
 }
 
 func TestOrphan(t *testing.T) {

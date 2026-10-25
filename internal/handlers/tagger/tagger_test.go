@@ -2,12 +2,10 @@ package tagger
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
-	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,27 +20,30 @@ const (
 	tyChe  = "Ты чё"
 )
 
-func newTagHandler(
-	t *testing.T,
-	history []chathistory.Entry,
-	settings *chatsettings.Settings,
-	settingsErr error,
-) (*Handler, *MockmessageGenerator) {
+func newTagHandler(t *testing.T, history []chathistory.Entry) (*Handler, *MockmessageGenerator) {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
 	gen := NewMockmessageGenerator(ctrl)
 	buf := NewMockhistoryBuffer(ctrl)
 	buf.EXPECT().Get(chatID).Return(history)
-	sp := NewMocksettingsProvider(ctrl)
-	sp.EXPECT().GetForChat(gomock.Any(), chatID).Return(settings, settingsErr)
 
-	return &Handler{
-		ctx:              context.Background(),
-		generator:        gen,
-		history:          buf,
-		settingsProvider: sp,
-	}, gen
+	h := newHandler(
+		context.Background(),
+		gen,
+		buf,
+		nil,
+		newRegistry(t, newMemStorage()),
+		nil,
+		nil,
+		zeroRandom{},
+		nil,
+		&fakeSettings{},
+		tagFrom,
+		tagTo,
+	)
+
+	return h, gen
 }
 
 // spec: TAG-010
@@ -57,7 +58,7 @@ func TestBuildTag_PassesChatHistoryAndSteering(t *testing.T) {
 			Text:   "обсуждаем пиво",
 		},
 	}
-	h, gen := newTagHandler(t, history, &chatsettings.Settings{AIChance: 0.7}, nil)
+	h, gen := newTagHandler(t, history)
 
 	var gotSteering string
 	gen.EXPECT().
@@ -70,7 +71,7 @@ func TestBuildTag_PassesChatHistoryAndSteering(t *testing.T) {
 			}
 		})
 
-	h.buildTag(chatID, userID, nick)
+	h.buildTag(chatID, userID, nick, 0.7)
 
 	assert.Contains(t, gotSteering, "«"+nick+"»", "кличка участника попадает в указание")
 	assert.Contains(
@@ -97,12 +98,12 @@ func TestBuildTag_SteeringSanitizesNickname(t *testing.T) {
 func TestBuildTag_StripsDuplicatedLeadingNickname(t *testing.T) {
 	t.Parallel()
 
-	h, gen := newTagHandler(t, nil, &chatsettings.Settings{AIChance: 1}, nil)
+	h, gen := newTagHandler(t, nil)
 	gen.EXPECT().
 		GetMessageTextForTag(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(message.GenerationResult{Message: "валера, ты чё затих?", Strategy: message.AiGenerationStrategy})
 
-	text := h.buildTag(chatID, userID, nick)
+	text := h.buildTag(chatID, userID, nick, 1)
 
 	assert.Equal(t, "[Валера](tg://user?id=200), Ты чё затих?", text)
 }
@@ -132,26 +133,14 @@ func TestStripLeadingNickname(t *testing.T) {
 func TestBuildTag_FormatsMentionWithNicknameAndText(t *testing.T) {
 	t.Parallel()
 
-	h, gen := newTagHandler(t, nil, &chatsettings.Settings{AIChance: 1}, nil)
+	h, gen := newTagHandler(t, nil)
 	gen.EXPECT().
 		GetMessageTextForTag(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(message.GenerationResult{Message: "чего молчишь", Strategy: message.ByListGenerationStrategy})
 
-	text := h.buildTag(chatID, userID, nick)
+	text := h.buildTag(chatID, userID, nick, 1)
 
 	assert.Equal(t, "[Валера](tg://user?id=200), чего молчишь", text)
-}
-
-// spec: TAG-005
-func TestBuildTag_AIChanceFromSettings_ZeroOnError(t *testing.T) {
-	t.Parallel()
-
-	h, gen := newTagHandler(t, nil, nil, errors.New("db down"))
-	gen.EXPECT().
-		GetMessageTextForTag(gomock.Any(), gomock.Any(), float32(0), gomock.Any()).
-		Return(message.GenerationResult{Message: "х", Strategy: message.ByListGenerationStrategy})
-
-	require.NotEmpty(t, h.buildTag(chatID, userID, nick))
 }
 
 // spec: TAG-011
@@ -173,19 +162,15 @@ func TestBuildTag_IdentifiesSelectedUserInsteadOfLastAuthor(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			history := []chathistory.Entry{{ID: 1, Author: "@other", Text: "я тебя выключу"}}
-			h, gen := newTagHandler(t, history, &chatsettings.Settings{AIChance: 1}, nil)
-			h.chatToUsers = make(map[string][]int64)
-			h.uniqueUsers = make(map[string]string)
-			h.queue = &taggerQueue{}
-			rnd := NewMockrandomizer(gomock.NewController(t))
-			rnd.EXPECT().Int63n(gomock.Any()).Return(int64(0))
-			h.random = rnd
-			h.addChatInfo("100", &telebot.User{ID: userID, Username: "old"})
-			h.addChatInfo("100", &telebot.User{ID: 300, Username: "other"})
-			h.addChatInfo(
-				"100",
+			h, gen := newTagHandler(t, history)
+			ctx := context.Background()
+			require.NoError(t, h.addUser(ctx, chatID, &telebot.User{ID: userID, Username: "old"}))
+			require.NoError(t, h.addUser(ctx, chatID, &telebot.User{ID: 300, Username: "other"}))
+			require.NoError(t, h.addUser(
+				ctx,
+				chatID,
 				&telebot.User{ID: userID, Username: tc.username, FirstName: tc.firstName},
-			)
+			))
 
 			var steering string
 			gen.EXPECT().GetMessageTextForTag(
@@ -198,7 +183,7 @@ func TestBuildTag_IdentifiesSelectedUserInsteadOfLastAuthor(t *testing.T) {
 				}
 			})
 
-			text := h.buildTag(chatID, userID, nick)
+			text := h.buildTag(chatID, userID, nick, 1)
 
 			assert.Contains(t, steering, "«"+tc.wantAuthor+"»")
 			assert.Contains(t, steering, "случайное обращение")
@@ -210,7 +195,7 @@ func TestBuildTag_IdentifiesSelectedUserInsteadOfLastAuthor(t *testing.T) {
 			assert.Contains(t, steering, "Если его реплик в истории нет")
 			assert.NotContains(t, steering, "@old")
 			assert.Equal(t, "[Валера](tg://user?id=200), Чего притих?", text)
-			assert.Equal(t, []int64{userID, 300}, h.chatToUsers["100"])
+			assert.Equal(t, []int64{userID, 300}, h.users.Users(chatID))
 		})
 	}
 }

@@ -1,10 +1,8 @@
 package tagger
 
 import (
-	"container/heap"
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,12 +33,6 @@ func buildTagSteering(author, nickname string) string {
 	)
 }
 
-type chat string
-
-func (c chat) Recipient() string {
-	return string(c)
-}
-
 type Handler struct {
 	ctx                context.Context
 	generator          messageGenerator
@@ -50,15 +42,20 @@ type Handler struct {
 	nicknameRepository nicknameRepository
 	statIncer          statIncer
 	settingsProvider   settingsProvider
-	chatToUsers        map[string][]int64
-	queue              *taggerQueue
-	bot                *telebot.Bot
-	uniqueUsers        map[string]string
-	nicknames          []string
-	nextFromNano       int64
-	nextInterval       int64
-	nicknamesMu        sync.RWMutex
-	mu                 sync.Mutex
+	// users меняется только под mu: иначе список, эпохи и задача чата разойдутся.
+	users userRegistry
+	bot   *telebot.Bot
+	// jobs хранит токен единственной задачи чата — в очереди или в работе у отправителя.
+	jobs map[int64]uint64
+	// epochs не очищаются, чтобы эпоха очищенного чата не начиналась заново.
+	epochs       map[int64]chatEpoch
+	queue        taggerQueue
+	nicknames    []string
+	nextFromNano int64
+	nextInterval int64
+	jobSeq       uint64
+	nicknamesMu  sync.RWMutex
+	mu           sync.Mutex
 }
 
 func New(
@@ -66,6 +63,7 @@ func New(
 	generator messageGenerator,
 	history historyBuffer,
 	nicknameRepository nicknameRepository,
+	users userRegistry,
 	bot *telebot.Bot,
 	log logger,
 	random randomizer,
@@ -74,29 +72,16 @@ func New(
 	nextFrom, nextTo time.Duration,
 	updateNicknames time.Duration,
 ) (*Handler, error) {
-	if nextFrom > nextTo {
-		nextFrom, nextTo = nextTo, nextFrom
-	}
-	out := &Handler{
-		ctx:                ctx,
-		generator:          generator,
-		history:            history,
-		bot:                bot,
-		nicknameRepository: nicknameRepository,
-		log:                log,
-		statIncer:          statIncer,
-		settingsProvider:   settingsProvider,
-		queue:              &taggerQueue{queue: make([]taggerJob, 0, 10)},
-		chatToUsers:        make(map[string][]int64, 10),
-		uniqueUsers:        make(map[string]string, 2_000),
-		nextFromNano:       nextFrom.Nanoseconds(),
-		nextInterval:       nextTo.Nanoseconds() - nextFrom.Nanoseconds() + 1,
-		random:             random,
-	}
+	out := newHandler(
+		ctx, generator, history, nicknameRepository, users, bot, log, random,
+		statIncer, settingsProvider, nextFrom, nextTo,
+	)
 
 	if err := out.updateNicknames(); err != nil {
 		return nil, fmt.Errorf("can't init nicknames list: %w", err)
 	}
+
+	out.scheduleKnownChats()
 
 	go func() {
 		t := time.NewTimer(updateNicknames)
@@ -126,81 +111,135 @@ func New(
 	return out, nil
 }
 
+// newHandler собирает Handler без загрузки данных и фоновых горутин.
+func newHandler(
+	ctx context.Context,
+	generator messageGenerator,
+	history historyBuffer,
+	nicknameRepository nicknameRepository,
+	users userRegistry,
+	bot *telebot.Bot,
+	log logger,
+	random randomizer,
+	statIncer statIncer,
+	settingsProvider settingsProvider,
+	nextFrom, nextTo time.Duration,
+) *Handler {
+	if nextFrom > nextTo {
+		nextFrom, nextTo = nextTo, nextFrom
+	}
+	return &Handler{
+		ctx:                ctx,
+		generator:          generator,
+		history:            history,
+		bot:                bot,
+		nicknameRepository: nicknameRepository,
+		users:              users,
+		log:                log,
+		statIncer:          statIncer,
+		settingsProvider:   settingsProvider,
+		jobs:               make(map[int64]uint64, 10),
+		epochs:             make(map[int64]chatEpoch, 10),
+		nextFromNano:       nextFrom.Nanoseconds(),
+		nextInterval:       nextTo.Nanoseconds() - nextFrom.Nanoseconds() + 1,
+		random:             random,
+	}
+}
+
 func (h *Handler) sender(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			h.queue.clean()
 			return
-		case <-time.After(time.Second):
+		case now := <-ticker.C:
+			h.tick(ctx, now)
 		}
+	}
+}
 
-		if h.queue.Len() == 0 {
-			continue
+// tick делает одну попытку тега, если срок ближайшей задачи наступил. После попытки
+// у непустого чата всегда остаётся ровно одна следующая задача.
+func (h *Handler) tick(ctx context.Context, now time.Time) {
+	attempt, ok := h.takeDue(now)
+	if !ok {
+		return
+	}
+	defer h.finishJob(attempt.job)
+
+	h.tag(ctx, attempt)
+}
+
+func (h *Handler) tag(ctx context.Context, attempt tagAttempt) {
+	chatID, userID := attempt.job.chatID, attempt.userID
+	logCtx := h.log.WithFields(ctx, map[string]any{
+		"chat_id": chatID,
+		"user_id": userID,
+	})
+	// Ошибка чтения настроек не выключает теггер: пинг идёт с нулевой вероятностью LLM.
+	var aiChance float32
+	settings, err := h.settingsProvider.GetForChat(ctx, chatID)
+	switch {
+	case err != nil:
+		h.log.Warn(h.log.WithError(logCtx, err), "can't get chat settings for tagger")
+	case !settings.TaggerEnabled:
+		return
+	default:
+		aiChance = settings.AIChance
+	}
+
+	tgChat := &telebot.Chat{ID: chatID}
+
+	member, err := h.bot.ChatMemberOf(tgChat, &telebot.User{ID: userID})
+	if err != nil {
+		h.log.Warn(h.log.WithError(logCtx, err), "can't check tagger candidate membership")
+		return
+	}
+
+	switch membershipOf(member) {
+	case membershipGone:
+		if err := h.dropGoneCandidate(ctx, attempt); err != nil {
+			h.log.Warn(h.log.WithError(logCtx, err), "can't forget left tagger candidate")
 		}
+		return
+	case membershipUnknown:
+		h.log.Warn(logCtx, "tagger candidate membership is unknown")
+		return
+	case membershipPresent:
+	}
 
-		taskI := heap.Pop(h.queue)
-		task := taskI.(taggerJob)
+	nicknames, err := h.nicknameRepository.GetEnabledNicknames()
+	if err != nil {
+		h.log.Warn(h.log.WithError(logCtx, err), "can't get nicknames from repositody")
+		return
+	}
+	if len(nicknames) == 0 {
+		h.log.Warn(logCtx, "no enabled nicknames for tagger")
+		return
+	}
 
-		if time.Now().Before(task.tagAt) {
-			heap.Push(h.queue, task)
-			continue
-		}
+	h.mu.Lock()
+	nickname := nicknames[h.random.Intn(len(nicknames))]
+	h.mu.Unlock()
 
-		nicknames, err := h.nicknameRepository.GetEnabledNicknames()
-		if err != nil {
-			h.log.Warn(
-				h.log.WithError(ctx, err),
-				"can't get nicknames from repositody",
-			)
-			continue
-		}
+	text := h.buildTag(chatID, userID, nickname, aiChance)
 
-		nickname := nicknames[h.random.Intn(len(nicknames))]
+	if !h.canSend(attempt) {
+		return
+	}
 
-		h.mu.Lock()
-		users := h.chatToUsers[task.chatID]
+	go h.statIncer.Inc(h.ctx, chatID, userID, stats.PersonalOperationType)
 
-		if len(users) == 0 {
-			h.mu.Unlock()
-			continue
-		}
-
-		index := h.random.Intn(len(users))
-		user := users[index]
-
-		h.mu.Unlock()
-		chatIDint, _ := strconv.ParseInt(task.chatID, 10, 64)
-		text := h.buildTag(chatIDint, user, nickname)
-
-		go h.statIncer.Inc(h.ctx, chatIDint, user, stats.PersonalOperationType)
-
-		if _, err := h.bot.Send(chat(task.chatID), text, telebot.ModeMarkdown); err != nil {
-			h.log.Warn(
-				h.log.WithFields(
-					h.log.WithError(ctx, err),
-					map[string]any{
-						"chat_id": task.chatID,
-						"user_id": user,
-					},
-				),
-				"can't send tagger message",
-			)
-		}
-
-		heap.Push(
-			h.queue,
-			taggerJob{
-				chatID: task.chatID,
-				tagAt:  h.makeTagAt(),
-			},
-		)
+	if _, err := h.bot.Send(tgChat, text, telebot.ModeMarkdown); err != nil {
+		h.log.Warn(h.log.WithError(logCtx, err), "can't send tagger message")
 	}
 }
 
 // buildTag generates the insult text for a scheduled tag and owns the
 // timer-driven root span (there is no incoming update / telebot.Context here).
-func (h *Handler) buildTag(chatID, user int64, nickname string) string {
+func (h *Handler) buildTag(chatID, user int64, nickname string, aiChance float32) string {
 	ctx, span := tracing.Tracer().Start(context.Background(), "tagger")
 	defer span.End()
 	span.SetAttributes(
@@ -210,14 +249,7 @@ func (h *Handler) buildTag(chatID, user int64, nickname string) string {
 		attribute.String("nickname", nickname),
 	)
 
-	var aiChance float32
-	if s, err := h.settingsProvider.GetForChat(ctx, chatID); err == nil {
-		aiChance = s.AIChance
-	}
-
-	h.mu.Lock()
-	author := h.uniqueUsers[fmt.Sprintf("%d:%d", chatID, user)]
-	h.mu.Unlock()
+	author, _ := h.users.Author(chatID, user)
 	if author == "" {
 		author = message.SanitizeAuthor("", "", user, false)
 	}
@@ -277,51 +309,11 @@ func (h *Handler) Slug() string {
 func (h *Handler) Handle(ctx telebot.Context) error {
 	chat := ctx.Chat()
 	user := ctx.Sender()
-	member, err := h.bot.ChatMemberOf(chat, user)
-	if err != nil {
-		return fmt.Errorf("can't check if user is member of chat: %w", err)
-	}
-
-	if chat == nil ||
-		user == nil ||
-		member == nil ||
-		member.Role == telebot.Left ||
-		member.Role == telebot.Kicked {
+	if chat == nil || user == nil {
 		return nil
 	}
 
-	h.addChatInfo(chat.Recipient(), user)
-
-	return nil
-}
-
-func (h *Handler) addChatInfo(chat string, user *telebot.User) {
-	if user.IsBot {
-		return
-	}
-
-	key := fmt.Sprintf("%s:%d", chat, user.ID)
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	_, notUnique := h.uniqueUsers[key]
-	h.uniqueUsers[key] = message.SanitizeAuthor(user.Username, user.FirstName, user.ID, user.IsBot)
-	if notUnique {
-		return
-	}
-
-	h.chatToUsers[chat] = append(h.chatToUsers[chat], user.ID)
-
-	if len(h.chatToUsers[chat]) == 1 {
-		heap.Push(
-			h.queue,
-			taggerJob{
-				chatID: chat,
-				tagAt:  h.makeTagAt(),
-			},
-		)
-	}
+	return h.observe(h.ctx, chat, user)
 }
 
 func (h *Handler) makeTagAt() time.Time {

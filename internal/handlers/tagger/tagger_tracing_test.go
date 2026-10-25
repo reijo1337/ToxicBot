@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,9 +23,6 @@ func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	gen := NewMockmessageGenerator(ctrl)
-	settings := NewMocksettingsProvider(ctrl)
-	settings.EXPECT().GetForChat(gomock.Any(), int64(100)).
-		Return(&chatsettings.Settings{AIChance: 0.5}, nil)
 	history := NewMockhistoryBuffer(ctrl)
 	history.EXPECT().Get(int64(100)).Return(nil)
 	gen.EXPECT().
@@ -34,12 +30,12 @@ func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 		Return(message.GenerationResult{Message: "сосунок", Strategy: message.AiGenerationStrategy})
 
 	h := &Handler{
-		ctx:              context.Background(),
-		generator:        gen,
-		history:          history,
-		settingsProvider: settings,
+		ctx:       context.Background(),
+		generator: gen,
+		history:   history,
+		users:     newRegistry(t, newMemStorage()),
 	}
-	text := h.buildTag(100, 200, "ник")
+	text := h.buildTag(100, 200, "ник", 0.5)
 	assert.Contains(t, text, "сосунок")
 
 	ended := sr.Ended()

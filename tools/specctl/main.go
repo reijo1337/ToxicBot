@@ -2,7 +2,8 @@
 //
 // Использование:
 //
-//	specctl verify   — у каждого covered-сценария есть тест с якорем "// spec: <ID>"
+//	specctl verify   — у каждого covered-сценария есть тест с якорем "// spec: <ID>",
+//	                   а якоря ведут в living specs или в дельты активных changes
 //	specctl orphan   — пакеты, не закреплённые ни за одной capability
 //	specctl ready    — все активные changes заархивированы перед merge
 //	specctl report   — сводка по покрытию и активным changes
@@ -108,7 +109,7 @@ func dispatch(ctx context.Context, command string, e env) error {
 			strings.Join(ids, ", "),
 		)
 	case "verify":
-		return emit(check.Verify(e.caps, e.anchors))
+		return emit(check.Verify(e.caps, e.anchors, changes.PendingScenarios(e.active)))
 	case "drift":
 		findings, err := driftFindings(ctx, e)
 		if err != nil {

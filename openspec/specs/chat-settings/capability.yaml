@@ -2,7 +2,7 @@ prefix: SET
 
 owns:
   - internal/features/chatsettings
-  - internal/domain/chat
+  - internal/domain/chat/settings.go
   - internal/handlers/settings
   - internal/infrastructure/storage/db/chat_settings.go
 
@@ -29,3 +29,7 @@ scenarios:
   SET-020: covered
   SET-021: covered
   SET-022: covered
+  SET-023: covered
+  SET-024: covered
+  SET-025: covered
+  SET-026: covered

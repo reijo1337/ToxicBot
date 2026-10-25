@@ -26,6 +26,7 @@ type Config struct {
 	VoiceReactChance             float32       `envconfig:"VOICE_REACTIONS_CHANCE"                              default:"0.8"`
 	PhotoReactChance             float32       `envconfig:"PHOTO_REACTIONS_CHANCE"                              default:"1"`
 	NicknamesUpdatePerios        time.Duration `envconfig:"NICKNAMES_UPDATE_PERIOD"                             default:"10m"`
+	TaggerEnabled                bool          `envconfig:"TAGGER_ENABLED"                                      default:"true"`
 	SqliteFilePath               string        `envconfig:"SQLITE_FILE_PATH"                    required:"true"`
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/phrase_filter"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/internal/features/taggerusers"
 	"github.com/reijo1337/ToxicBot/internal/handlers"
 	"github.com/reijo1337/ToxicBot/internal/handlers/bulling"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_photo"
@@ -104,6 +105,7 @@ func main() {
 	responseLogStorage := db.NewResponseLogStorage(connGetter)
 	chatSettingsStorage := db.NewChatSettingsStorage(connGetter)
 	chatHistoryStorage := db.NewChatHistoryStorage(connGetter)
+	taggerUsersStorage := db.NewTaggerUsersStorage(connGetter)
 
 	gs, err := google_spreadsheet.New(ctx)
 	if err != nil {
@@ -171,6 +173,7 @@ func main() {
 		VoiceReactChance:   cfg.VoiceReactChance,
 		AIChance:           cfg.BullingsAIChance,
 		PhotoReactChance:   cfg.PhotoReactChance,
+		TaggerEnabled:      cfg.TaggerEnabled,
 	}
 
 	settingsProvider := chatsettings.NewProvider(chatSettingsStorage, settingsDefaults)
@@ -338,11 +341,20 @@ func main() {
 		botAuthor,
 	)
 
+	taggerUsers, err := taggerusers.New(ctx, taggerUsersStorage)
+	if err != nil {
+		logger.Fatal(
+			logger.WithError(ctx, err),
+			"can't restore tagger users",
+		)
+	}
+
 	taggerHandler, err := tagger.New(
 		ctx,
 		generator,
 		chatHistory,
 		sheetsRepository,
+		taggerUsers,
 		b,
 		logger,
 		random,

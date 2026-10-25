@@ -10,4 +10,5 @@ type ChatSettings struct {
 	VoiceReactChance   *float32
 	AIChance           *float32
 	PhotoReactChance   *float32
+	TaggerEnabled      *bool
 }

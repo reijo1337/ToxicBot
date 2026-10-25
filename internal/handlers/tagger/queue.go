@@ -1,60 +1,142 @@
 package tagger
 
 import (
-	"sync"
+	"container/heap"
+	"context"
 	"time"
 )
 
 type taggerJob struct {
 	tagAt  time.Time
-	chatID string
+	chatID int64
+	token  uint64
 }
 
-type taggerQueue struct {
-	queue []taggerJob
-	mu    sync.Mutex
+// taggerQueue — куча-минимум по времени тега. Не потокобезопасна: все операции
+// выполняются под Handler.mu.
+type taggerQueue []taggerJob
+
+func (q *taggerQueue) Len() int           { return len(*q) }
+func (q *taggerQueue) Less(i, j int) bool { return (*q)[i].tagAt.Before((*q)[j].tagAt) }
+func (q *taggerQueue) Swap(i, j int)      { (*q)[i], (*q)[j] = (*q)[j], (*q)[i] }
+
+func (q *taggerQueue) Push(x any) {
+	job, _ := x.(taggerJob)
+	*q = append(*q, job)
 }
 
-func (t *taggerQueue) clean() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.queue = t.queue[:0]
-}
-
-// Len is the number of elements in the collection.
-func (t *taggerQueue) Len() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return len(t.queue)
-}
-
-// Less reports whether the element with index i
-// must sort before the element with index j.
-func (t *taggerQueue) Less(i, j int) bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.queue[i].tagAt.Before(t.queue[j].tagAt)
-}
-
-// Swap swaps the elements with indexes i and j.
-func (t *taggerQueue) Swap(i, j int) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.queue[i], t.queue[j] = t.queue[j], t.queue[i]
-}
-
-// Push add x as element Len()
-func (t *taggerQueue) Push(x any) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.queue = append(t.queue, x.(taggerJob))
-}
-
-// Pop remove and return element Len() - 1
-func (t *taggerQueue) Pop() any {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	out := t.queue[len(t.queue)-1]
-	t.queue = t.queue[:len(t.queue)-1]
+func (q *taggerQueue) Pop() any {
+	old := *q
+	out := old[len(old)-1]
+	*q = old[:len(old)-1]
 	return out
+}
+
+// indexOf возвращает позицию задачи чата или -1.
+func (q *taggerQueue) indexOf(chatID int64) int {
+	for i, job := range *q {
+		if job.chatID == chatID {
+			return i
+		}
+	}
+	return -1
+}
+
+// tagAttempt — снятая с очереди задача и выбранный для неё кандидат.
+type tagAttempt struct {
+	job    taggerJob
+	userID int64
+	// epoch — эпоха состава чата на момент выбора кандидата.
+	epoch chatEpoch
+}
+
+// takeDue снимает ближайшую задачу, если её срок наступил, и выбирает кандидата.
+// Будущая задача остаётся в очереди нетронутой.
+func (h *Handler) takeDue(now time.Time) (tagAttempt, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.queue) == 0 || now.Before(h.queue[0].tagAt) {
+		return tagAttempt{}, false
+	}
+
+	job, _ := heap.Pop(&h.queue).(taggerJob)
+
+	users := h.users.Users(job.chatID)
+	if len(users) == 0 {
+		delete(h.jobs, job.chatID)
+		return tagAttempt{}, false
+	}
+
+	return tagAttempt{
+		job:    job,
+		userID: users[h.random.Intn(len(users))],
+		epoch:  h.epochs[job.chatID],
+	}, true
+}
+
+// dropGoneCandidate удаляет кандидата, отсутствие которого подтвердила проверка, если
+// за время запроса никто не подтвердил присутствие в чате. Иначе ответ мог устареть:
+// например, участник успел вернуться.
+func (h *Handler) dropGoneCandidate(ctx context.Context, a tagAttempt) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.epochs[a.job.chatID].outdates(a.epoch, membershipGone) {
+		return nil
+	}
+
+	return h.removeUserLocked(ctx, a.job.chatID, a.userID)
+}
+
+// canSend сообщает, актуальна ли попытка перед отправкой: задача чата не сменилась,
+// а кандидат остался в списке. Сеть не держит блокировку, поэтому за время проверки
+// или генерации чат могли очистить и наполнить заново с новым сроком.
+func (h *Handler) canSend(a tagAttempt) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if !h.jobCurrentLocked(a.job) {
+		return false
+	}
+
+	_, ok := h.users.Author(a.job.chatID, a.userID)
+	return ok
+}
+
+// finishJob планирует следующий тег, если задача всё ещё актуальна: за время попытки
+// чат могли очистить и наполнить заново, тогда у него уже есть новая задача.
+func (h *Handler) finishJob(job taggerJob) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if !h.jobCurrentLocked(job) {
+		return
+	}
+
+	delete(h.jobs, job.chatID)
+	h.scheduleLocked(job.chatID)
+}
+
+// jobCurrentLocked сообщает, остаётся ли задача единственной задачей своего чата.
+func (h *Handler) jobCurrentLocked(job taggerJob) bool {
+	return h.jobs[job.chatID] == job.token
+}
+
+func (h *Handler) scheduleLocked(chatID int64) {
+	if _, ok := h.jobs[chatID]; ok || len(h.users.Users(chatID)) == 0 {
+		return
+	}
+
+	h.jobSeq++
+	h.jobs[chatID] = h.jobSeq
+	heap.Push(&h.queue, taggerJob{tagAt: h.makeTagAt(), chatID: chatID, token: h.jobSeq})
+}
+
+func (h *Handler) unscheduleLocked(chatID int64) {
+	delete(h.jobs, chatID)
+
+	if i := h.queue.indexOf(chatID); i >= 0 {
+		heap.Remove(&h.queue, i)
+	}
 }

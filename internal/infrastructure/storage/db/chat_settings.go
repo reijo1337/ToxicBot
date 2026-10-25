@@ -19,6 +19,7 @@ type chatSettingsRow struct {
 	VoiceReactChance   *float64 `db:"voice_react_chance"`
 	AIChance           *float64 `db:"ai_chance"`
 	PhotoReactChance   *float64 `db:"photo_react_chance"`
+	TaggerEnabled      *bool    `db:"tagger_enabled"`
 }
 
 type ChatSettingsStorage struct {
@@ -40,6 +41,7 @@ select
 	,voice_react_chance
 	,ai_chance
 	,photo_react_chance
+	,tagger_enabled
 from chat_settings
 where chat_id = ?`
 
@@ -72,6 +74,7 @@ insert into chat_settings (
 	,voice_react_chance
 	,ai_chance
 	,photo_react_chance
+	,tagger_enabled
 	,updated_at
 ) values (
 	:chat_id
@@ -82,6 +85,7 @@ insert into chat_settings (
 	,:voice_react_chance
 	,:ai_chance
 	,:photo_react_chance
+	,:tagger_enabled
 	,current_timestamp
 ) on conflict(chat_id) do update set
 	threshold_count      = coalesce(:threshold_count,      threshold_count)
@@ -91,6 +95,7 @@ insert into chat_settings (
 	,voice_react_chance   = coalesce(:voice_react_chance,   voice_react_chance)
 	,ai_chance            = coalesce(:ai_chance,            ai_chance)
 	,photo_react_chance   = coalesce(:photo_react_chance,   photo_react_chance)
+	,tagger_enabled       = coalesce(:tagger_enabled,       tagger_enabled)
 	,updated_at          = current_timestamp`
 
 	_, err := s.connGetter.Get(ctx).NamedExecContext(ctx, query, row)
@@ -150,6 +155,8 @@ func rowToDomain(row chatSettingsRow) *chat.ChatSettings {
 		out.PhotoReactChance = &v
 	}
 
+	out.TaggerEnabled = row.TaggerEnabled
+
 	return out
 }
 
@@ -190,6 +197,8 @@ func domainToRow(chatID int64, s chat.ChatSettings) chatSettingsRow {
 		v := float64(*s.PhotoReactChance)
 		row.PhotoReactChance = &v
 	}
+
+	row.TaggerEnabled = s.TaggerEnabled
 
 	return row
 }
