@@ -32,9 +32,7 @@ type Config struct {
 func Parse() (*Config, error) {
 	var out Config
 	if err := envconfig.Process("", &out); err != nil {
-		if err = envconfig.Usage("", &out); err != nil {
-			return nil, fmt.Errorf("can't parse config: %w", err)
-		}
+		return nil, fmt.Errorf("can't parse config: %w", err)
 	}
 
 	if out.TaggerIntervalFrom > out.TaggerIntervalTo {
