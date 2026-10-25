@@ -85,15 +85,18 @@ Periodically tags a random chat member with an insult. Uses a priority queue (mi
 
 ### Settings (`internal/handlers/settings/`)
 
-`/settings` command — доступна в групповых чатах (в личке отказывает):
+`/settings` command — все формы доступны только владельцу и администраторам текущей группы
+или супергруппы (в личке отказывает):
 
 - `/settings` — view current settings
 - `/settings <key> <value>` — modify a setting
 - `/settings reset` — reset to defaults
 
-**Проверки прав администратора в коде нет** — поменять настройки может любой участник группы.
-Раньше здесь было написано «admin-only»; расхождение нашлось при baseline спек и зафиксировано в
-`openspec/specs/chat-settings/spec.md`. Либо добавить проверку роли, либо признать это поведением.
+Перед каждой командой роль отправителя заново проверяется через Telegram `getChatMember`.
+Анонимный администратор может вызвать команду от имени самой текущей супергруппы;
+сообщения от имени другого чата или канала не предоставляют доступ. При невозможности
+подтвердить права команда не выполняется. Для гарантированной проверки других пользователей
+сам бот должен быть администратором чата.
 
 ### Stats (`internal/handlers/stat/`)
 
@@ -139,7 +142,7 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `BULLINGS_AI_CHANCE` | 0.75 | Probability of AI generation |
 | `STICKER_REACTIONS_CHANCE` | 0.4 | Probability of sticker reaction |
 | `VOICE_REACTIONS_CHANCE` | 0.8 | Probability of voice reaction |
-| `PHOTO_REACTIONS_CHANCE` | 0.75 | Probability of photo reaction |
+| `PHOTO_REACTIONS_CHANCE` | 1 | Probability of photo reaction |
 | `STICKER_SETS` | `static_bulling_by_stickersthiefbot` | Sticker packs (comma-separated) |
 | `TAGGER_INTERVAL_FROM` | 10h | Min tagger interval |
 | `TAGGER_INTERVAL_TO` | 24h | Max tagger interval |
@@ -196,7 +199,7 @@ Stored in the `chat_settings` SQLite table. Cached by `chatsettings.Provider` wi
 | `sticker_chance` | float 0.0-1.0 | 0.4 |
 | `voice_chance` | float 0.0-1.0 | 0.8 |
 | `ai_chance` | float 0.0-1.0 | 0.75 |
-| `photo_chance` | float 0.0-1.0 | 0.75 |
+| `photo_chance` | float 0.0-1.0 | 1 |
 
 ## Statistics and Analytics
 
