@@ -14,11 +14,50 @@ import (
 	reflect "reflect"
 
 	chathistory "github.com/reijo1337/ToxicBot/internal/features/chathistory"
+	linkcontext "github.com/reijo1337/ToxicBot/internal/features/linkcontext"
 	message "github.com/reijo1337/ToxicBot/internal/features/message"
 	stats "github.com/reijo1337/ToxicBot/internal/features/stats"
 	gomock "go.uber.org/mock/gomock"
 	telebot "gopkg.in/telebot.v3"
 )
+
+// MocklinkEnricher is a mock of linkEnricher interface.
+type MocklinkEnricher struct {
+	ctrl     *gomock.Controller
+	recorder *MocklinkEnricherMockRecorder
+	isgomock struct{}
+}
+
+// MocklinkEnricherMockRecorder is the mock recorder for MocklinkEnricher.
+type MocklinkEnricherMockRecorder struct {
+	mock *MocklinkEnricher
+}
+
+// NewMocklinkEnricher creates a new mock instance.
+func NewMocklinkEnricher(ctrl *gomock.Controller) *MocklinkEnricher {
+	mock := &MocklinkEnricher{ctrl: ctrl}
+	mock.recorder = &MocklinkEnricherMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MocklinkEnricher) EXPECT() *MocklinkEnricherMockRecorder {
+	return m.recorder
+}
+
+// Enrich mocks base method.
+func (m *MocklinkEnricher) Enrich(ctx context.Context, chatID int64, ref linkcontext.Reference) chathistory.Link {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Enrich", ctx, chatID, ref)
+	ret0, _ := ret[0].(chathistory.Link)
+	return ret0
+}
+
+// Enrich indicates an expected call of Enrich.
+func (mr *MocklinkEnricherMockRecorder) Enrich(ctx, chatID, ref any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Enrich", reflect.TypeOf((*MocklinkEnricher)(nil).Enrich), ctx, chatID, ref)
+}
 
 // MockmessageGenerator is a mock of messageGenerator interface.
 type MockmessageGenerator struct {

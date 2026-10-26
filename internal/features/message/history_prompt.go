@@ -51,11 +51,7 @@ func formatUserContent(e chathistory.Entry, history []chathistory.Entry, isTrigg
 	}
 
 	b.WriteString(`>`)
-	if e.PreFormatted {
-		b.WriteString(e.Text)
-	} else {
-		b.WriteString(SanitizeText(e.Text, maxEntryRunes))
-	}
+	writeEntryBody(&b, e)
 	b.WriteString(`</msg>`)
 
 	return b.String()

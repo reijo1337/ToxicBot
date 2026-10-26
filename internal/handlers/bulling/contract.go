@@ -5,10 +5,15 @@ import (
 	"context"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
+	"github.com/reijo1337/ToxicBot/internal/features/linkcontext"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"gopkg.in/telebot.v3"
 )
+
+type linkEnricher interface {
+	Enrich(ctx context.Context, chatID int64, ref linkcontext.Reference) chathistory.Link
+}
 
 type messageGenerator interface {
 	GetMessageTextWithHistory(

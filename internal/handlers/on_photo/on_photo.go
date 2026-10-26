@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
+	"github.com/reijo1337/ToxicBot/internal/features/linkcontext"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/internal/telegram/linkextract"
 	"github.com/reijo1337/ToxicBot/pkg/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
@@ -32,6 +34,7 @@ type Handler struct {
 	generator        messageGenerator
 	settingsProvider settingsProvider
 	history          historyBuffer
+	links            linkEnricher
 	downloader       downloader
 	fileReader       fileReader
 	replier          botReplier
@@ -42,6 +45,12 @@ type Handler struct {
 	r                *rand.Rand
 	processedGroups  map[string]struct{}
 	muGroups         sync.Mutex
+}
+
+type Option func(*Handler)
+
+func WithLinkEnricher(enricher linkEnricher) Option {
+	return func(h *Handler) { h.links = enricher }
 }
 
 func New(
@@ -57,8 +66,9 @@ func New(
 	statIncer statIncer,
 	botID int64,
 	botAuthor string,
+	opts ...Option,
 ) *Handler {
-	return &Handler{
+	h := &Handler{
 		ctx:              ctx,
 		describer:        describer,
 		generator:        generator,
@@ -74,6 +84,10 @@ func New(
 		r:                rand.New(rand.NewSource(time.Now().UnixNano())),
 		processedGroups:  make(map[string]struct{}),
 	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 func (h *Handler) Slug() string {
@@ -187,8 +201,14 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		FromBot:      false,
 		PreFormatted: true,
 	}
-
 	history := h.history.Get(chat.ID)
+	if h.links != nil {
+		ref := linkextract.First(msg.Caption, msg.CaptionEntities)
+		if ref.URL != "" {
+			userEntry.Link = h.links.Enrich(spanCtx, chat.ID, linkcontext.Reference(ref))
+		}
+	}
+
 	history = dropBotEntries(history)
 	history = append(history, userEntry)
 	hasCaption := msg.Caption != ""

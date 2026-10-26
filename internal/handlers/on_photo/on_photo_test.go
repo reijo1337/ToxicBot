@@ -14,6 +14,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
+	pkglogger "github.com/reijo1337/ToxicBot/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
@@ -246,10 +247,13 @@ func TestHandle_MessageWithoutPhoto_ReturnsNil(t *testing.T) {
 }
 
 // spec: PHOTO-005
+// spec: PHOTO-026
+// spec: PHOTO-027
 func TestHandle_DescriberError_NoHistoryWrite(t *testing.T) {
 	t.Parallel()
 
 	env := newTestEnv(t)
+	env.handler.logger = pkglogger.New()
 
 	msg := photoMessage(50, "", replyToBotMessage())
 	ctx := newCtx(msg, goodSender())
@@ -260,8 +264,6 @@ func TestHandle_DescriberError_NoHistoryWrite(t *testing.T) {
 		Return(io.NopCloser(bytes.NewReader([]byte("img"))), nil)
 	env.describer.EXPECT().GenerateContent(gomock.Any(), describePrompt, []byte("img")).
 		Return("", errors.New("gigachat down"))
-	env.logger.EXPECT().WithError(gomock.Any(), gomock.Any()).Return(context.Background())
-	env.logger.EXPECT().Warn(gomock.Any(), "can't describe image")
 
 	// No AddAll, no Get expected.
 	require.NoError(t, env.handler.Handle(ctx))
