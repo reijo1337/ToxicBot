@@ -256,7 +256,7 @@ type fakeGenerator struct {
 }
 
 func (g *fakeGenerator) GetMessageTextForTag(
-	_ context.Context, _ []chathistory.Entry, aiChance float32, _ string,
+	_ context.Context, _ []chathistory.Entry, aiChance float32, _ message.TagTarget,
 ) message.GenerationResult {
 	g.aiChances = append(g.aiChances, aiChance)
 	if g.onGenerate != nil {
@@ -267,10 +267,6 @@ func (g *fakeGenerator) GetMessageTextForTag(
 		Strategy: message.ByListGenerationStrategy,
 	}
 }
-
-type noHistory struct{}
-
-func (noHistory) Get(int64) []chathistory.Entry { return nil }
 
 // fakeSettings — настройки чатов: теггер включён, пока чат не попал в disabled.
 type fakeSettings struct {
@@ -332,6 +328,7 @@ func (l *fakeLogger) messages() []string {
 }
 
 type stand struct {
+	history  *chathistory.Buffer
 	h        *Handler
 	settings *fakeSettings
 	api      *fakeTelegram
@@ -368,6 +365,7 @@ func newStandWithAPI(t *testing.T, storage taggerusers.Store, api *fakeTelegram)
 	bot.Me = &telebot.User{ID: botID, IsBot: true}
 
 	s := &stand{
+		history:  chathistory.NewBuffer(100),
 		api:      api,
 		bot:      bot,
 		log:      &fakeLogger{},
@@ -376,7 +374,7 @@ func newStandWithAPI(t *testing.T, storage taggerusers.Store, api *fakeTelegram)
 		settings: &fakeSettings{},
 	}
 	s.h = newHandler(
-		context.Background(), s.gen, noHistory{}, s.nicks, newRegistry(t, storage), bot, s.log,
+		context.Background(), s.gen, s.history, s.nicks, newRegistry(t, storage), bot, s.log,
 		zeroRandom{}, noStats{}, s.settings, tagFrom, tagTo,
 	)
 	s.h.scheduleKnownChats()

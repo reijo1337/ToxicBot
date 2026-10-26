@@ -1,0 +1,252 @@
+[
+  {
+    "id": "tag-phone-discussion-author",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91002,
+      "author": "@fixture_link",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_link",
+        "text": "https://example.invalid/demo — царский кайф",
+        "sender_id": 91002
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "@fixture_link",
+        "text": "@fixture_phone, что у тебя за телефончик?",
+        "sender_id": 91002,
+        "reply_to_id": 1
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_phone",
+        "text": "На картинке показана новая модель.",
+        "sender_id": 91003,
+        "reply_to_id": 2
+      },
+      {
+        "id": 4,
+        "time": "2026-01-01T12:00:04Z",
+        "author": "fixture_bot",
+        "text": "Телефончик у тебя прямо как у царя.",
+        "reply_to_id": 2,
+        "from_bot": true
+      }
+    ],
+    "actual": ""
+  },
+  {
+    "id": "tag-own-before-foreign-threat",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "@fixture_target",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_target",
+        "text": "Собрал полку, а лишних шурупов осталась целая горсть.",
+        "sender_id": 91001
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "fixture_bot",
+        "text": "С шурупами у тебя полный порядок, зато полка на честном слове.",
+        "reply_to_id": 1,
+        "from_bot": true
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_other",
+        "text": "Я тебя выключу!",
+        "sender_id": 91002,
+        "reply_to_id": 1
+      }
+    ],
+    "actual": ""
+  },
+  {
+    "id": "tag-identical-authors",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "Одинаковая подпись",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "Одинаковая подпись",
+        "text": "Заварил чай, но забыл положить заварку.",
+        "sender_id": 91001
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "Одинаковая подпись",
+        "text": "Купил себе дорогой телефон.",
+        "sender_id": 91002
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "fixture_bot",
+        "text": "У тебя и телефон дорогой, и чай без заварки.",
+        "reply_to_id": 2,
+        "from_bot": true
+      }
+    ],
+    "actual": ""
+  },
+  {
+    "id": "tag-renamed-account",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "@fixture_new",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_old",
+        "text": "Обещал собрать скворечник, а пока нарисовал только крышу.",
+        "sender_id": 91001
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "@fixture_old",
+        "text": "Это я заказал новый телефон.",
+        "sender_id": 91002
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_new",
+        "text": "Скворечник всё ещё на стадии крыши.",
+        "sender_id": 91001,
+        "reply_to_id": 1
+      },
+      {
+        "id": 4,
+        "time": "2026-01-01T12:00:04Z",
+        "author": "fixture_bot",
+        "text": "Вот и новый телефон тебе скворечник не построил.",
+        "reply_to_id": 2,
+        "from_bot": true
+      }
+    ],
+    "actual": ""
+  },
+  {
+    "id": "tag-legacy-with-known-author",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "@fixture_target",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_target",
+        "text": "Я купил себе телефон и уже разбил экран."
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "@fixture_legacy",
+        "text": "Здесь обсуждали скриншоты и покупку телефона."
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_other",
+        "text": "Ремонт экрана теперь дороже чехла.",
+        "sender_id": 91002,
+        "reply_to_id": 1
+      },
+      {
+        "id": 4,
+        "time": "2026-01-01T12:00:04Z",
+        "author": "fixture_bot",
+        "text": "Опять ты свой телефон разбил.",
+        "reply_to_id": 1,
+        "from_bot": true
+      },
+      {
+        "id": 5,
+        "time": "2026-01-01T12:00:05Z",
+        "author": "@fixture_target",
+        "text": "Собрал настольную лампу, а выключатель оказался под подставкой.",
+        "sender_id": 91001
+      }
+    ],
+    "actual": ""
+  },
+  {
+    "id": "tag-own-question-about-other-phone",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "@fixture_target",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_other",
+        "text": "Мой новый телефон перестал заряжаться.",
+        "sender_id": 91002
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "@fixture_target",
+        "text": "@fixture_other, твой телефон ещё на гарантии?",
+        "sender_id": 91001,
+        "reply_to_id": 1
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_other",
+        "text": "Да, понесу его в ремонт.",
+        "sender_id": 91002,
+        "reply_to_id": 2
+      },
+      {
+        "id": 4,
+        "time": "2026-01-01T12:00:04Z",
+        "author": "fixture_bot",
+        "text": "Твой телефончик опять сломался.",
+        "reply_to_id": 2,
+        "from_bot": true
+      }
+    ],
+    "actual": ""
+  }
+]

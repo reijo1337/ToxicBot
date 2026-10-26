@@ -1,6 +1,8 @@
 package cases
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -130,4 +132,60 @@ func TestSaveLoad_RoundTrip(t *testing.T) {
 	require.Len(t, domain, 1)
 	assert.Equal(t, alice, domain[0].Author)
 	assert.True(t, domain[0].Time.Equal(at(0)))
+}
+
+func TestTagRoundTripPreservesIdentity(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "tag.json")
+	raw := `[{"id":"tag-identity","kind":"tag","target":{"user_id":901,"author":"@synthetic_target","nickname":"Чайник"},"history":[{"id":1,"sender_id":902,"author":"@synthetic_other","text":"тема"}]}]`
+	require.NoError(t, os.WriteFile(path, []byte(raw), 0o600))
+	cs, err := Load(path)
+	require.NoError(t, err)
+	require.Len(t, cs, 1)
+	require.Len(t, cs[0].DomainHistory(), 1)
+	assert.Equal(t, int64(902), cs[0].DomainHistory()[0].SenderID)
+	require.NoError(t, Save(path, cs))
+	saved, err := os.ReadFile(path) //nolint:gosec // path is inside t.TempDir
+	require.NoError(t, err)
+
+	var got []struct {
+		Target  json.RawMessage `json:"target"`
+		History []struct {
+			SenderID int64 `json:"sender_id"`
+		} `json:"history"`
+	}
+	require.NoError(t, json.Unmarshal(saved, &got))
+	require.Len(t, got, 1)
+	assert.JSONEq(
+		t,
+		`{"user_id":901,"author":"@synthetic_target","nickname":"Чайник"}`,
+		string(got[0].Target),
+	)
+	require.Len(t, got[0].History, 1)
+	assert.Equal(t, int64(902), got[0].History[0].SenderID)
+}
+
+func TestFromHistoryPreservesSenderID(t *testing.T) {
+	t.Parallel()
+	cs := FromHistory(1, []chathistory.Entry{
+		{ID: 1, SenderID: 901, Author: "@synthetic_target", Text: "тема"},
+		{ID: 2, FromBot: true, Text: "ответ"},
+	}, 1)
+	require.Len(t, cs, 1)
+	require.Len(t, cs[0].DomainHistory(), 1)
+	assert.Equal(t, int64(901), cs[0].DomainHistory()[0].SenderID)
+}
+
+func TestLoadLegacyTextPhoto(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "legacy.json")
+	raw := `[{"id":"legacy-text","kind":"text","history":[{"id":1,"author":"@synthetic","text":"тема"}]},{"id":"legacy-photo","kind":"photo","history":[{"id":2,"author":"@synthetic","text":"<photo></photo>","pre_formatted":true}]}]`
+	require.NoError(t, os.WriteFile(path, []byte(raw), 0o600))
+	cs, err := Load(path)
+	require.NoError(t, err)
+	require.Len(t, cs, 2)
+	assert.Equal(t, KindText, cs[0].Kind)
+	assert.Equal(t, KindPhoto, cs[1].Kind)
+	assert.Zero(t, cs[0].DomainHistory()[0].SenderID)
+	assert.True(t, cs[1].DomainHistory()[0].PreFormatted)
 }

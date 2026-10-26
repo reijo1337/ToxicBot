@@ -41,7 +41,10 @@ const usage = `promptlab — стенд для сравнения промпто
 Флаги каждой команды: promptlab <команда> -h
 `
 
-const baselineName = "baseline"
+const (
+	baselineName       = "baseline"
+	defaultRepetitions = 1
+)
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -159,7 +162,8 @@ func runMatrix(ctx context.Context, args []string) error {
 		"variants", "", "только эти варианты, через запятую (baseline — промпт из кода)",
 	)
 	limit := fs.Int("limit", 0, "взять только первые N кейсов")
-	kind := fs.String("kind", "", "только кейсы этого типа: text или photo")
+	repetitions := fs.Int("repetitions", defaultRepetitions, "число повторов каждого кейса")
+	kind := fs.String("kind", "", "только кейсы этого типа: text, photo или tag")
 	noBaseline := fs.Bool("no-baseline", false, "не гонять промпт из кода")
 	examplesCount := fs.Int("examples-count", 0, "взять только первые N примеров (0 — все)")
 	steeringFile := fs.String(
@@ -172,6 +176,10 @@ func runMatrix(ctx context.Context, args []string) error {
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if *repetitions < 1 {
+		return errors.New("repetitions: ожидается положительное число")
 	}
 
 	cfg, err := conf.Load(*configPath)
@@ -232,10 +240,11 @@ func runMatrix(ctx context.Context, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "кейсов %d · вариантов %d · моделей %d · вызовов %d\n",
 		len(cs), len(selectedVariants), len(selectedModels),
-		len(cs)*len(selectedVariants)*len(selectedModels))
+		*repetitions*len(cs)*len(selectedVariants)*len(selectedModels))
 
 	results, err := lab.Run(ctx, lab.Params{
 		Cases:       cs,
+		Repetitions: *repetitions,
 		Variants:    selectedVariants,
 		Models:      selectedModels,
 		Examples:    examples,

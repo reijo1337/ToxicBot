@@ -1,0 +1,87 @@
+[
+  {
+    "id": "tag-absent-phone",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "@fixture_target",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_link",
+        "text": "https://example.invalid/demo — царский кайф",
+        "sender_id": 91002
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "@fixture_link",
+        "text": "@fixture_phone, что у тебя за телефончик?",
+        "sender_id": 91002,
+        "reply_to_id": 1
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_phone",
+        "text": "На картинке показана новая модель.",
+        "sender_id": 91003,
+        "reply_to_id": 2
+      },
+      {
+        "id": 4,
+        "time": "2026-01-01T12:00:04Z",
+        "author": "fixture_bot",
+        "text": "Телефончик у тебя прямо как у царя.",
+        "reply_to_id": 2,
+        "from_bot": true
+      }
+    ],
+    "actual": ""
+  },
+  {
+    "id": "tag-legacy-unknown-sender",
+    "chat_id": -99001,
+    "kind": "tag",
+    "target": {
+      "user_id": 91001,
+      "author": "@fixture_target",
+      "nickname": "Чайник"
+    },
+    "history": [
+      {
+        "id": 1,
+        "time": "2026-01-01T12:00:01Z",
+        "author": "@fixture_target",
+        "text": "Я купил себе телефон и уже разбил экран."
+      },
+      {
+        "id": 2,
+        "time": "2026-01-01T12:00:02Z",
+        "author": "@fixture_legacy",
+        "text": "Здесь обсуждали скриншоты и покупку телефона."
+      },
+      {
+        "id": 3,
+        "time": "2026-01-01T12:00:03Z",
+        "author": "@fixture_other",
+        "text": "Ремонт экрана теперь дороже чехла.",
+        "sender_id": 91002,
+        "reply_to_id": 1
+      },
+      {
+        "id": 4,
+        "time": "2026-01-01T12:00:04Z",
+        "author": "fixture_bot",
+        "text": "Опять ты свой телефон разбил.",
+        "reply_to_id": 1,
+        "from_bot": true
+      }
+    ],
+    "actual": ""
+  }
+]

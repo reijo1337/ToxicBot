@@ -10,6 +10,7 @@ scenarios:
   VOICE-004: manual
   VOICE-005: todo
   VOICE-006: todo
+  VOICE-007: covered
 
 notes:
   VOICE-004: >-

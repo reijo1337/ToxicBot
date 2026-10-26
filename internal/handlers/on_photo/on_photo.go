@@ -172,8 +172,14 @@ func (h *Handler) Handle(ctx telebot.Context) error {
 		replyToID = msg.ReplyTo.ID
 	}
 
+	senderID := sender.ID
+	if sender.IsBot || msg.SenderChat != nil || senderID < 0 {
+		senderID = 0
+	}
+
 	userEntry := chathistory.Entry{
 		ID:           msg.ID,
+		SenderID:     senderID,
 		Time:         msg.Time(),
 		Author:       author,
 		Text:         promptText,

@@ -276,3 +276,30 @@ func TestBuffer_NoStore_BackwardCompatible(t *testing.T) {
 	buf.Add(1, chathistory.Entry{ID: 1, Text: "x"})
 	assert.Equal(t, "x", buf.Get(1)[0].Text)
 }
+
+// spec: HIST-019
+// spec: HIST-021
+func TestBuffer_PreservesMixedSenderIdentitiesAcrossStore(t *testing.T) {
+	t.Parallel()
+	store := newFakeStore()
+	store.preload[7] = []chathistory.Entry{{ID: 1, Author: "Alex", Text: "unknown legacy"}}
+	buffer := chathistory.NewBuffer(10, chathistory.WithStore(store))
+	buffer.Add(7, chathistory.Entry{ID: 2, SenderID: 101, Author: "Alex", Text: "first"})
+	buffer.AddAll(7,
+		chathistory.Entry{ID: 3, SenderID: 202, Author: "Alex", Text: "second"},
+		chathistory.Entry{ID: 4, Author: "bot", Text: "reply", FromBot: true},
+	)
+	want := []chathistory.Entry{
+		{ID: 1, Author: "Alex", Text: "unknown legacy"},
+		{ID: 2, SenderID: 101, Author: "Alex", Text: "first"},
+		{ID: 3, SenderID: 202, Author: "Alex", Text: "second"},
+		{ID: 4, Author: "bot", Text: "reply", FromBot: true},
+	}
+	assert.Equal(t, want, store.lastSaved(7))
+	store.preload[7] = store.lastSaved(7)
+	restarted := chathistory.NewBuffer(10, chathistory.WithStore(store))
+	got := restarted.Get(7)
+	assert.Equal(t, want, got)
+	got[1].SenderID = 999
+	assert.Equal(t, want, restarted.Get(7), "callers must not overwrite stored authorship")
+}

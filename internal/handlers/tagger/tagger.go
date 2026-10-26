@@ -3,35 +3,20 @@ package tagger
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"github.com/reijo1337/ToxicBot/pkg/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/telebot.v3"
 )
-
-// Кличка выбирается случайно и не идентифицирует автора в истории.
-const tagSteering = `Дополнительные правила именно для этой реплики:
-- Это пинг по таймеру. Сейчас никто ничего не писал; вся история — только контекст, на неё напрямую не отвечай. Правила ответа на последнюю реплику здесь не применяются.
-- Ты сам обращаешься к участнику с подписью «%s» в атрибуте from истории. Именно он — адресат этой реплики.
-- «%s» — случайное обращение перед твоей репликой, а не настоящее имя участника и не подпись автора в истории. Не ищи адресата по этой кличке.
-- Не приписывай адресату слова и поступки других участников. Его собственные реплики определяй только по его подписи from. Если его реплик в истории нет или авторство неоднозначно, используй общую тему, не утверждая, что он что-то сказал или сделал.
-- Отталкивайся от того, что недавно обсуждали в чате, или от того, что адресат отмалчивается.
-- Не начинай реплику с обращения по кличке или имени — обращение уже стоит перед твоей репликой.`
-
-func buildTagSteering(author, nickname string) string {
-	return fmt.Sprintf(
-		tagSteering,
-		message.SanitizeText(author, 64),
-		message.SanitizeText(nickname, 64),
-	)
-}
 
 type Handler struct {
 	ctx                context.Context
@@ -173,10 +158,9 @@ func (h *Handler) tick(ctx context.Context, now time.Time) {
 }
 
 func (h *Handler) tag(ctx context.Context, attempt tagAttempt) {
-	chatID, userID := attempt.job.chatID, attempt.userID
+	chatID := attempt.job.chatID
 	logCtx := h.log.WithFields(ctx, map[string]any{
 		"chat_id": chatID,
-		"user_id": userID,
 	})
 	// Ошибка чтения настроек не выключает теггер: пинг идёт с нулевой вероятностью LLM.
 	var aiChance float32
@@ -190,6 +174,13 @@ func (h *Handler) tag(ctx context.Context, attempt tagAttempt) {
 		aiChance = settings.AIChance
 	}
 
+	history := slices.Clone(h.history.Get(chatID))
+	attempt, ok := h.selectTarget(attempt.job, history)
+	if !ok {
+		return
+	}
+	userID := attempt.userID
+	logCtx = h.log.WithFields(logCtx, map[string]any{"user_id": userID})
 	tgChat := &telebot.Chat{ID: chatID}
 
 	member, err := h.bot.ChatMemberOf(tgChat, &telebot.User{ID: userID})
@@ -224,7 +215,7 @@ func (h *Handler) tag(ctx context.Context, attempt tagAttempt) {
 	nickname := nicknames[h.random.Intn(len(nicknames))]
 	h.mu.Unlock()
 
-	text := h.buildTag(chatID, userID, nickname, aiChance)
+	text := h.buildTag(chatID, userID, nickname, aiChance, history)
 
 	if !h.canSend(attempt) {
 		return
@@ -239,7 +230,9 @@ func (h *Handler) tag(ctx context.Context, attempt tagAttempt) {
 
 // buildTag generates the insult text for a scheduled tag and owns the
 // timer-driven root span (there is no incoming update / telebot.Context here).
-func (h *Handler) buildTag(chatID, user int64, nickname string, aiChance float32) string {
+func (h *Handler) buildTag(
+	chatID, user int64, nickname string, aiChance float32, history []chathistory.Entry,
+) string {
 	ctx, span := tracing.Tracer().Start(context.Background(), "tagger")
 	defer span.End()
 	span.SetAttributes(
@@ -256,9 +249,9 @@ func (h *Handler) buildTag(chatID, user int64, nickname string, aiChance float32
 
 	genResult := h.generator.GetMessageTextForTag(
 		ctx,
-		h.history.Get(chatID),
+		history,
 		aiChance,
-		buildTagSteering(author, nickname),
+		message.TagTarget{UserID: user, Author: author, Nickname: nickname},
 	)
 	span.SetAttributes(tracing.ContentAttr("output", genResult.Message))
 

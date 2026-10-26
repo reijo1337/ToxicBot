@@ -17,6 +17,7 @@ scenarios:
   BULL-011: manual
   BULL-012: covered
   BULL-013: todo
+  BULL-014: covered
 
 notes:
   BULL-011: >-

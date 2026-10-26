@@ -16,6 +16,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/reijo1337/ToxicBot/internal/domain/chat"
+	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/storage/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -216,6 +217,14 @@ func TestRestart_ResumesPingsFromSQLiteWithoutNewMessages(t *testing.T) {
 	applySchema(t, path)
 	storage, closeDB := openSQLite(t, path)
 	s := newStand(t, storage)
+	s.history.Add(
+		groupA,
+		chathistory.Entry{SenderID: 1, Author: "@alice", Text: "сообщение в первом чате"},
+	)
+	s.history.Add(
+		groupB,
+		chathistory.Entry{SenderID: 1, Author: "@alice", Text: "сообщение во втором чате"},
+	)
 
 	require.NoError(t, s.h.Handle(s.message(groupA, user(1, "alice"))))
 	require.NoError(t, s.h.OnJoin().Handle(s.joined(groupA, user(1, "alice"), user(2, "bob"))))
@@ -227,6 +236,7 @@ func TestRestart_ResumesPingsFromSQLiteWithoutNewMessages(t *testing.T) {
 	defer closeDB()
 	before := time.Now()
 	restarted := newStandWithAPI(t, storage, &fakeTelegram{})
+	restarted.h.history = s.history
 
 	assert.Equal(t, map[int64]string{1: "@alice_renamed", 2: "@bob"}, restarted.candidates(groupA))
 	assert.Equal(t, map[int64]string{1: "@alice"}, restarted.candidates(groupB))
@@ -291,6 +301,7 @@ func TestTick_ConfirmedLeftIsNotPingedEvenIfDeleteFails(t *testing.T) {
 
 	st := newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"})
 	s := newStand(t, st)
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.api.setMember(1, leftRaw)
 	st.fail(&st.deleteErr, errDisk)
 
@@ -311,6 +322,7 @@ func TestTick_LeftDuringDowntimeIsRemovedBeforePing(t *testing.T) {
 		chat.TaggerUser{ChatID: groupA, UserID: 2, Author: "@stay"},
 	)
 	s := newStand(t, st)
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.api.setMember(1, `{"status":"kicked","user":{"id":1}}`)
 	now := due()
 
@@ -339,6 +351,7 @@ func TestTick_UnverifiableMembershipSkipsPingAndKeepsCandidate(t *testing.T) {
 
 			st := newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"})
 			s := newStand(t, st)
+			s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 			s.api.setRaw(1, body)
 
 			s.h.tick(context.Background(), due())
@@ -358,6 +371,7 @@ func TestTick_DuePingIsSentAndNextPlanned(t *testing.T) {
 	t.Parallel()
 
 	s := newStand(t, newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"}))
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	first := s.jobsOf(groupA)[0]
 
 	s.h.tick(context.Background(), due())
@@ -419,6 +433,7 @@ func TestTick_RefillDuringAttemptKeepsSingleJob(t *testing.T) {
 
 	st := newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"})
 	s := newStand(t, st)
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.gen.onGenerate = func() {
 		// за время генерации адресат вышел, а в чат пришёл новый участник
 		assert.NoError(t, s.h.OnLeft().Handle(s.left(nil, user(1, "alice"))))
@@ -436,6 +451,7 @@ func TestTick_LeftDuringGenerationOfLastCandidateLeavesNoJob(t *testing.T) {
 	t.Parallel()
 
 	s := newStand(t, newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"}))
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.gen.onGenerate = func() {
 		assert.NoError(t, s.h.OnLeft().Handle(s.left(nil, user(1, "alice"))))
 	}
@@ -472,6 +488,7 @@ func TestTick_NicknameOrSendFailureReschedules(t *testing.T) {
 
 			st := newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"})
 			s := newStand(t, st)
+			s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 			tc.setup(s)
 
 			s.h.tick(context.Background(), due())
