@@ -33,6 +33,43 @@ func TestDrift_DeltaPresent(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestDrift_ArchivedDelta(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		specFile    string
+		wantFailure bool
+	}{
+		{
+			name:     "living spec updated after archive",
+			specFile: "openspec/specs/" + photoCapNm + "/spec.md",
+		},
+		{
+			name:        "metadata alone does not confirm behavior",
+			specFile:    "openspec/specs/" + photoCapNm + "/capability.yaml",
+			wantFailure: true,
+		},
+		{
+			name:        "another capability does not confirm behavior",
+			specFile:    "openspec/specs/tagger/spec.md",
+			wantFailure: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := Drift(driftCaps(), DriftInput{
+				Changed: []string{photoPkg + "/on_photo.go", tt.specFile},
+			})
+
+			assert.Equal(t, tt.wantFailure, HasFailures(got))
+		})
+	}
+}
+
 func TestDrift_SkipPathsIgnored(t *testing.T) {
 	t.Parallel()
 

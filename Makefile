@@ -9,7 +9,7 @@ GOLANGCI_LINT_DOCKER = docker run --rm \
 	-w /app \
 	golangci/golangci-lint:$(GOLANGCI_LINT_VERSION)
 
-.PHONY: spec-new spec-check spec-status spec-cover spec-archive test promptlab-fetch promptlab-extract promptlab-run
+.PHONY: spec-new spec-check spec-merge-check spec-status spec-cover spec-archive test promptlab-fetch promptlab-extract promptlab-run
 
 ### ── promptlab: сравнение промптов и моделей на кейсах из прода ───────
 ### Руководство — tools/promptlab/README.md
@@ -55,6 +55,10 @@ spec-check:
 	$(SPECCTL) drift --base $(SPEC_BASE)
 	$(SPECCTL) coverage --base $(SPEC_BASE)
 	-$(SPECCTL) orphan
+
+### перед merge все changes должны быть заархивированы
+spec-merge-check:
+	$(SPECCTL) ready
 
 ### что сейчас в работе: покрытие, активные changes, технический долг
 spec-status:
