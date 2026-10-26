@@ -1,0 +1,21 @@
+name: Configure host
+
+on:
+  workflow_dispatch:
+
+jobs:
+  configure-host:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure host limits
+        uses: dawidd6/action-ansible-playbook@v9
+        with:
+          playbook: deploy-host.yaml
+          directory: deploy/
+          key: ${{ secrets.SSH_MAMA_KEY }}
+          inventory: |
+            [vscale_host]
+            vscale ansible_host=${{ vars.VDS_HOST }} ansible_user=root

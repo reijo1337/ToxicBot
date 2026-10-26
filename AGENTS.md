@@ -50,7 +50,7 @@ pkg/                                     — shared utilities (logger, migrator,
 openspec/                                — living specs по capability + активные changes (см. SDD.md)
 tools/specctl/                           — гейт: связывает спеки с кодом и тестами
 tools/promptlab/                         — offline-стенд: варианты промпта × модели на кейсах из прода (см. README там)
-deploy/                                  — ansible-плейбуки деплоя (Docker): бот, Jaeger/tracing, Dozzle/логи
+deploy/                                  — ansible-плейбуки деплоя (Docker): бот, Jaeger/tracing, Dozzle/логи, лимиты хоста (журнал, swap)
 ```
 
 ## Handlers and Features

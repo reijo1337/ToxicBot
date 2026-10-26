@@ -39,6 +39,10 @@
         restart_policy: always
         ports:
           - "8888:8080"
+        log_driver: json-file
+        log_options:
+          max-size: "10m"
+          max-file: "3"
         volumes:
           - "/var/run/docker.sock:/var/run/docker.sock"
           - "{{ dozzle_data_dir }}:/data"
