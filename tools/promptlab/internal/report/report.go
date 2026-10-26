@@ -1,5 +1,5 @@
 // Package report рендерит результаты прогона в markdown: по секции на кейс,
-// внутри — контекст, триггер, ответ из прода и таблица вариант × модель.
+// внутри — контекст, адресат или триггер и все результаты вариант × модель.
 package report
 
 import (
@@ -11,12 +11,13 @@ import (
 )
 
 type Result struct {
-	CaseID  string        `json:"case_id"`
-	Variant string        `json:"variant"`
-	Model   string        `json:"model"`
-	Text    string        `json:"text"`
-	Err     string        `json:"err,omitempty"`
-	Latency time.Duration `json:"latency"`
+	Repetition int           `json:"repetition"`
+	CaseID     string        `json:"case_id"`
+	Variant    string        `json:"variant"`
+	Model      string        `json:"model"`
+	Text       string        `json:"text"`
+	Err        string        `json:"err,omitempty"`
+	Latency    time.Duration `json:"latency"`
 }
 
 // contextTail — сколько последних записей окна показывать в отчёте.
@@ -24,9 +25,10 @@ const contextTail = 6
 
 // Render: порядок variants и models задаёт порядок строк и столбцов таблицы.
 func Render(cs []cases.Case, variants, models []string, results []Result) string {
-	byKey := make(map[string]Result, len(results))
+	byKey := make(map[string][]Result, len(results))
 	for _, r := range results {
-		byKey[key(r.CaseID, r.Variant, r.Model)] = r
+		k := key(r.CaseID, r.Variant, r.Model)
+		byKey[k] = append(byKey[k], r)
 	}
 
 	var b strings.Builder
@@ -43,10 +45,13 @@ func Render(cs []cases.Case, variants, models []string, results []Result) string
 		for j, e := range tail {
 			isTrigger := j == len(tail)-1
 			marker := ""
-			if isTrigger {
+			if isTrigger && c.Kind != cases.KindTag {
 				marker = " **← триггер**"
 			}
 			author := e.Author
+			if c.Kind == cases.KindTag && !e.FromBot {
+				author = fmt.Sprintf("%s (sender_id=%d)", author, e.SenderID)
+			}
 			if e.FromBot {
 				author = "🤖 " + author
 			}
@@ -60,7 +65,17 @@ func Render(cs []cases.Case, variants, models []string, results []Result) string
 			)
 		}
 
-		fmt.Fprintf(&b, "\n**В проде:** %s\n\n", cell(c.Actual))
+		if c.Kind == cases.KindTag && c.Target != nil {
+			fmt.Fprintf(
+				&b,
+				"\n**Адресат:** %s · ID `%d` · кличка: %s\n\n",
+				cell(c.Target.Author),
+				c.Target.UserID,
+				cell(c.Target.Nickname),
+			)
+		} else {
+			fmt.Fprintf(&b, "\n**В проде:** %s\n\n", cell(c.Actual))
+		}
 
 		b.WriteString("| вариант \\ модель |")
 		for _, m := range models {
@@ -75,15 +90,8 @@ func Render(cs []cases.Case, variants, models []string, results []Result) string
 		for _, v := range variants {
 			fmt.Fprintf(&b, "| **%s** |", v)
 			for _, m := range models {
-				r, ok := byKey[key(c.ID, v, m)]
-				switch {
-				case !ok:
-					b.WriteString(" — |")
-				case r.Err != "":
-					fmt.Fprintf(&b, " ⚠️ %s |", cell(r.Err))
-				default:
-					fmt.Fprintf(&b, " %s _(%.1fs)_ |", cell(r.Text), r.Latency.Seconds())
-				}
+				rs := byKey[key(c.ID, v, m)]
+				fmt.Fprintf(&b, " %s |", resultCell(rs))
 			}
 			b.WriteString("\n")
 		}
@@ -100,4 +108,26 @@ func cell(s string) string {
 	s = strings.ReplaceAll(s, "|", "\\|")
 	s = strings.ReplaceAll(s, "\n", " ")
 	return strings.TrimSpace(s)
+}
+
+func resultCell(results []Result) string {
+	if len(results) == 0 {
+		return "—"
+	}
+	entries := make([]string, 0, len(results))
+	for _, r := range results {
+		prefix := ""
+		if r.Repetition > 0 {
+			prefix = fmt.Sprintf("повтор %d: ", r.Repetition)
+		}
+		if r.Err != "" {
+			entries = append(entries, prefix+"⚠️ "+cell(r.Err))
+			continue
+		}
+		entries = append(
+			entries,
+			fmt.Sprintf("%s%s _(%.1fs)_", prefix, cell(r.Text), r.Latency.Seconds()),
+		)
+	}
+	return strings.Join(entries, "<br>")
 }

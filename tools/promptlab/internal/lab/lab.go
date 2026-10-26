@@ -28,9 +28,10 @@ type Variant struct {
 }
 
 type Params struct {
-	Cases    []cases.Case
-	Variants []Variant
-	Models   []conf.Model
+	Repetitions int
+	Cases       []cases.Case
+	Variants    []Variant
+	Models      []conf.Model
 	// Examples — фразы для блока <examples>; в проде их даёт Google Sheets.
 	Examples    []string
 	MaxTokens   int64
@@ -61,6 +62,14 @@ func ParseBotHistory(s string) (BotHistory, error) {
 }
 
 func Run(ctx context.Context, p Params) ([]report.Result, error) {
+	if p.Repetitions < 1 {
+		return nil, errors.New("repetitions: ожидается положительное число")
+	}
+	for _, c := range p.Cases {
+		if c.Kind == cases.KindTag && (c.Target == nil || c.Target.UserID <= 0) {
+			return nil, fmt.Errorf("кейс %s: tag target.user_id должен быть положительным", c.ID)
+		}
+	}
 	if len(p.Examples) == 0 {
 		return nil, errors.New("нужен хотя бы один пример для блока <examples>")
 	}
@@ -149,50 +158,62 @@ func runPair(
 		return nil, fmt.Errorf("%s × %s: собрать генератор: %w", v.Name, m.Name, err)
 	}
 
-	out := make([]report.Result, 0, len(p.Cases))
+	out := make([]report.Result, 0, len(p.Cases)*p.Repetitions)
 	for _, c := range p.Cases {
-		history := c.DomainHistory()
-		steering := ""
-		if c.Kind == cases.KindPhoto {
-			// Путь on_photo; факт пересылки в истории не сохраняется, hasForward всегда false.
-			history = dropBotEntries(history)
-		} else {
-			history = applyBotHistory(history, p.BotHistory)
-			steering = p.Steering
+		for repetition := 1; repetition <= p.Repetitions; repetition++ {
+			started := time.Now()
+			res := generateCase(ctx, gen, c, p, rnd)
+			r := report.Result{
+				CaseID: c.ID, Variant: v.Name, Model: m.Name,
+				Repetition: repetition, Latency: time.Since(started),
+			}
+			switch callErr := client.TakeErr(); {
+			case callErr != nil:
+				r.Err = callErr.Error()
+			case res.Strategy != message.AiGenerationStrategy:
+				r.Err = "фоллбэк на список без ошибки LLM (пустая история?)"
+			default:
+				r.Text = res.Message
+			}
+			out = append(out, r)
+			_, _ = fmt.Fprintf(
+				p.Progress,
+				"%s × %s · %s · повтор %d · %.1fs\n",
+				v.Name,
+				m.Name,
+				c.ID,
+				repetition,
+				r.Latency.Seconds(),
+			)
 		}
-		if c.Kind == cases.KindPhoto {
-			trigger, _ := c.Trigger()
-			hasCaption := strings.Contains(trigger.Text, "<caption>")
-			steering = message.BuildPhotoSteering(rnd, hasCaption, false)
-		}
-
-		started := time.Now()
-		res := gen.GetMessageTextWithHistoryAndSteering(ctx, history, 1, true, steering)
-		r := report.Result{
-			CaseID:  c.ID,
-			Variant: v.Name,
-			Model:   m.Name,
-			Latency: time.Since(started),
-		}
-		switch callErr := client.TakeErr(); {
-		case callErr != nil:
-			r.Err = callErr.Error()
-		case res.Strategy != message.AiGenerationStrategy:
-			r.Err = "фоллбэк на список без ошибки LLM (пустая история?)"
-		default:
-			r.Text = res.Message
-		}
-		out = append(out, r)
-		_, _ = fmt.Fprintf(
-			p.Progress,
-			"%s × %s · %s · %.1fs\n",
-			v.Name,
-			m.Name,
-			c.ID,
-			r.Latency.Seconds(),
-		)
 	}
+
 	return out, nil
+}
+
+func generateCase(
+	ctx context.Context,
+	gen *message.Generator,
+	c cases.Case,
+	p Params,
+	rnd *rand.Rand,
+) message.GenerationResult {
+	history := c.DomainHistory()
+	if c.Kind == cases.KindTag {
+		return gen.GetMessageTextForTag(ctx, history, 1, message.TagTarget{
+			UserID: c.Target.UserID, Author: c.Target.Author, Nickname: c.Target.Nickname,
+		})
+	}
+	steering := p.Steering
+	if c.Kind == cases.KindPhoto {
+		history = dropBotEntries(history)
+		trigger, _ := c.Trigger()
+		hasCaption := strings.Contains(trigger.Text, "<caption>")
+		steering = message.BuildPhotoSteering(rnd, hasCaption, false)
+	} else {
+		history = applyBotHistory(history, p.BotHistory)
+	}
+	return gen.GetMessageTextWithHistoryAndSteering(ctx, history, 1, true, steering)
 }
 
 func applyBotHistory(history []chathistory.Entry, mode BotHistory) []chathistory.Entry {

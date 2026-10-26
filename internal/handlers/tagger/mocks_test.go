@@ -85,17 +85,17 @@ func (m *MockmessageGenerator) EXPECT() *MockmessageGeneratorMockRecorder {
 }
 
 // GetMessageTextForTag mocks base method.
-func (m *MockmessageGenerator) GetMessageTextForTag(ctx context.Context, history []chathistory.Entry, aiChance float32, steering string) message.GenerationResult {
+func (m *MockmessageGenerator) GetMessageTextForTag(ctx context.Context, history []chathistory.Entry, aiChance float32, target message.TagTarget) message.GenerationResult {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMessageTextForTag", ctx, history, aiChance, steering)
+	ret := m.ctrl.Call(m, "GetMessageTextForTag", ctx, history, aiChance, target)
 	ret0, _ := ret[0].(message.GenerationResult)
 	return ret0
 }
 
 // GetMessageTextForTag indicates an expected call of GetMessageTextForTag.
-func (mr *MockmessageGeneratorMockRecorder) GetMessageTextForTag(ctx, history, aiChance, steering any) *gomock.Call {
+func (mr *MockmessageGeneratorMockRecorder) GetMessageTextForTag(ctx, history, aiChance, target any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextForTag", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextForTag), ctx, history, aiChance, steering)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessageTextForTag", reflect.TypeOf((*MockmessageGenerator)(nil).GetMessageTextForTag), ctx, history, aiChance, target)
 }
 
 // MockhistoryBuffer is a mock of historyBuffer interface.

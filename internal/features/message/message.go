@@ -274,18 +274,26 @@ func (g *Generator) GetMessageTextWithHistoryAndSteering(
 	forceAI bool,
 	steering string,
 ) GenerationResult {
-	return g.getMessageTextWithHistory(ctx, history, aiChance, forceAI, steering, replyGeneration)
+	return g.getMessageTextWithHistory(
+		ctx,
+		history,
+		aiChance,
+		forceAI,
+		steering,
+		replyGeneration,
+		TagTarget{},
+	)
 }
 
 // GetMessageTextForTag uses history as context without treating any entry as an
-// incoming message. Steering identifies the recipient of the timer-driven tag.
+// incoming message. The target identifies the recipient independently of display names.
 func (g *Generator) GetMessageTextForTag(
 	ctx context.Context,
 	history []chathistory.Entry,
 	aiChance float32,
-	steering string,
+	target TagTarget,
 ) GenerationResult {
-	return g.getMessageTextWithHistory(ctx, history, aiChance, false, steering, tagGeneration)
+	return g.getMessageTextWithHistory(ctx, history, aiChance, false, "", tagGeneration, target)
 }
 
 func (g *Generator) getMessageTextWithHistory(
@@ -295,8 +303,9 @@ func (g *Generator) getMessageTextWithHistory(
 	forceAI bool,
 	steering string,
 	mode generationMode,
+	target TagTarget,
 ) GenerationResult {
-	text, err := g.generateAiWithHistory(ctx, history, aiChance, forceAI, steering, mode)
+	text, err := g.generateAiWithHistory(ctx, history, aiChance, forceAI, steering, mode, target)
 	if err == nil {
 		return GenerationResult{Message: text, Strategy: AiGenerationStrategy}
 	} else if !errors.Is(err, errGenerationUnavailable) {
@@ -316,7 +325,24 @@ func (g *Generator) generateAiWithHistory(
 	forceAI bool,
 	steering string,
 	mode generationMode,
+	target TagTarget,
 ) (string, error) {
+	if mode == tagGeneration {
+		if target.UserID <= 0 {
+			return "", errGenerationUnavailable
+		}
+		history = tagUserHistory(history)
+		hasOwnHistory := false
+		for _, entry := range history {
+			if entry.SenderID > 0 && entry.SenderID == target.UserID {
+				hasOwnHistory = true
+				break
+			}
+		}
+		if !hasOwnHistory {
+			return "", errGenerationUnavailable
+		}
+	}
 	if len(history) == 0 {
 		return "", errGenerationUnavailable
 	}
@@ -363,7 +389,12 @@ func (g *Generator) generateAiWithHistory(
 		system = system + "\n\n" + steering
 	}
 
-	msgs := buildChatCompletions(system, history, mode)
+	var msgs []LLMMessage
+	if mode == tagGeneration {
+		msgs = buildTagCompletions(system, history, target)
+	} else {
+		msgs = buildChatCompletions(system, history, mode)
+	}
 	out, err := g.ai.Chat(ctx, msgs...)
 	if err != nil {
 		return "", err

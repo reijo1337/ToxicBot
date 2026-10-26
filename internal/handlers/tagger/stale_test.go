@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/reijo1337/ToxicBot/internal/domain/chat"
+	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/handlers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,6 +91,7 @@ func TestTick_StaleAttemptDoesNotPingRefilledChat(t *testing.T) {
 	t.Parallel()
 
 	s := newStand(t, newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"}))
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.gen.onGenerate = func() {
 		require.NoError(t, s.h.OnLeft().Handle(s.left(nil, user(1, "alice"))))
 		require.NoError(t, s.h.OnJoin().Handle(s.joined(groupA, nil, user(1, "alice"))))
@@ -120,6 +122,7 @@ func TestTick_StaleGoneAnswerKeepsRejoinedUser(t *testing.T) {
 
 			st := newMemStorage(users...)
 			s := newStand(t, st)
+			s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 			s.api.setMember(1, leftRaw)
 			started, release := s.api.holdMember(1)
 
@@ -151,6 +154,7 @@ func TestTick_StaleGoneAnswerKeepsUserWhoseLeaveWasMissed(t *testing.T) {
 	users := []chat.TaggerUser{{ChatID: groupA, UserID: 1, Author: "@alice"}}
 	st := newMemStorage(users...)
 	s := newStand(t, st)
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.api.setMember(1, leftRaw)
 	started, release := s.api.holdMember(1)
 

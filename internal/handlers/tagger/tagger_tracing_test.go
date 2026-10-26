@@ -24,7 +24,6 @@ func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	gen := NewMockmessageGenerator(ctrl)
 	history := NewMockhistoryBuffer(ctrl)
-	history.EXPECT().Get(int64(100)).Return(nil)
 	gen.EXPECT().
 		GetMessageTextForTag(gomock.Any(), nil, float32(0.5), gomock.Any()).
 		Return(message.GenerationResult{Message: "сосунок", Strategy: message.AiGenerationStrategy})
@@ -35,7 +34,7 @@ func TestBuildTag_EmitsTimerRootSpan(t *testing.T) {
 		history:   history,
 		users:     newRegistry(t, newMemStorage()),
 	}
-	text := h.buildTag(100, 200, "ник", 0.5)
+	text := h.buildTag(100, 200, "ник", 0.5, nil)
 	assert.Contains(t, text, "сосунок")
 
 	ended := sr.Ended()

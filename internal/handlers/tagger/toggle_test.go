@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/reijo1337/ToxicBot/internal/domain/chat"
+	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,6 +17,7 @@ func TestTick_DisabledChatSilentUntilEnabled(t *testing.T) {
 	t.Parallel()
 
 	s := newStand(t, newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"}))
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.settings.setEnabled(groupA, false)
 	first := s.jobsOf(groupA)[0]
 
@@ -57,6 +59,7 @@ func TestTick_SettingsErrorDoesNotDisable(t *testing.T) {
 	t.Parallel()
 
 	s := newStand(t, newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"}))
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.settings.aiChance = 0.7
 	s.settings.fail(errDisk)
 
@@ -72,6 +75,7 @@ func TestTick_AIChanceFromChatSettings(t *testing.T) {
 	t.Parallel()
 
 	s := newStand(t, newMemStorage(chat.TaggerUser{ChatID: groupA, UserID: 1, Author: "@alice"}))
+	s.history.Add(groupA, chathistory.Entry{SenderID: 1, Text: "собственная реплика Alice"})
 	s.settings.aiChance = 0.7
 
 	s.h.tick(context.Background(), due())

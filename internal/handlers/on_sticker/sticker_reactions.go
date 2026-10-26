@@ -89,8 +89,14 @@ func (sr *StickerReactions) Handle(ctx telebot.Context) error {
 	if msg.ReplyTo != nil {
 		replyToID = msg.ReplyTo.ID
 	}
+	senderID := sender.ID
+	if sender.IsBot || msg.SenderChat != nil || senderID < 0 {
+		senderID = 0
+	}
+
 	sr.history.Add(chat.ID, chathistory.Entry{
 		ID:        msg.ID,
+		SenderID:  senderID,
 		Time:      msg.Time(),
 		Author:    author,
 		Text:      "*прислал стикер*",

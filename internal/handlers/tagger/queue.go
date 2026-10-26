@@ -4,6 +4,8 @@ import (
 	"container/heap"
 	"context"
 	"time"
+
+	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 )
 
 type taggerJob struct {
@@ -50,7 +52,7 @@ type tagAttempt struct {
 	epoch chatEpoch
 }
 
-// takeDue снимает ближайшую задачу, если её срок наступил, и выбирает кандидата.
+// takeDue снимает ближайшую задачу, если её срок наступил.
 // Будущая задача остаётся в очереди нетронутой.
 func (h *Handler) takeDue(now time.Time) (tagAttempt, bool) {
 	h.mu.Lock()
@@ -68,9 +70,36 @@ func (h *Handler) takeDue(now time.Time) (tagAttempt, bool) {
 		return tagAttempt{}, false
 	}
 
+	return tagAttempt{job: job}, true
+}
+
+// selectTarget связывает одного уникального автора снимка с актуальной задачей и эпохой.
+func (h *Handler) selectTarget(job taggerJob, history []chathistory.Entry) (tagAttempt, bool) {
+	authors := make(map[int64]struct{}, len(history))
+	for _, entry := range history {
+		if !entry.FromBot && entry.SenderID > 0 {
+			authors[entry.SenderID] = struct{}{}
+		}
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if !h.jobCurrentLocked(job) {
+		return tagAttempt{}, false
+	}
+	users := h.users.Users(job.chatID)
+	eligible := make([]int64, 0, len(users))
+	for _, id := range users {
+		if _, ok := authors[id]; ok {
+			eligible = append(eligible, id)
+		}
+	}
+	if len(eligible) == 0 {
+		return tagAttempt{}, false
+	}
 	return tagAttempt{
 		job:    job,
-		userID: users[h.random.Intn(len(users))],
+		userID: eligible[h.random.Intn(len(eligible))],
 		epoch:  h.epochs[job.chatID],
 	}, true
 }

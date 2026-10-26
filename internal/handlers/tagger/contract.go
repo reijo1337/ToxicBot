@@ -20,7 +20,7 @@ type messageGenerator interface {
 		ctx context.Context,
 		history []chathistory.Entry,
 		aiChance float32,
-		steering string,
+		target message.TagTarget,
 	) message.GenerationResult
 }
 

@@ -1,7 +1,9 @@
 package db
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"testing"
 	"time"
 
@@ -103,4 +105,233 @@ func TestChatHistoryStorage_IsolatedByChat(t *testing.T) {
 	require.Len(t, out2, 1)
 	assert.Equal(t, "chat1", out1[0].Text)
 	assert.Equal(t, "chat2", out2[0].Text)
+}
+
+// wireHistoryEntry models the new persisted format independently of Entry.
+type wireHistoryEntry struct {
+	ID           int
+	SenderID     int64
+	Time         time.Time
+	Author       string
+	Text         string
+	ReplyToID    int
+	FromBot      bool
+	PreFormatted bool
+}
+
+// spec: HIST-019
+func TestChatHistoryStorage_SenderSurvivesRestart(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	entries := []wireHistoryEntry{
+		{ID: 1, SenderID: 101, Author: "Alex", Text: "first"},
+		{ID: 2, SenderID: 202, Author: "Alex", Text: "second", ReplyToID: 1},
+	}
+	var blob bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&blob).Encode(entries))
+	_, err := conn.ExecContext(ctx, "insert into chat_history values (?, ?)", 42, blob.Bytes())
+	require.NoError(t, err)
+	first := NewChatHistoryStorage(NewConnGetter(conn))
+	buffer := chathistory.NewBuffer(100, chathistory.WithStore(first))
+	loaded := buffer.Get(42)
+	require.Len(t, loaded, 2)
+	require.NoError(t, first.Save(ctx, 42, loaded))
+	restarted := chathistory.NewBuffer(
+		100,
+		chathistory.WithStore(NewChatHistoryStorage(NewConnGetter(conn))),
+	)
+	require.Equal(t, loaded, restarted.Get(42))
+	var persisted []byte
+	require.NoError(
+		t,
+		conn.GetContext(ctx, &persisted, "select data from chat_history where chat_id = ?", 42),
+	)
+	var got []wireHistoryEntry
+	require.NoError(t, gob.NewDecoder(bytes.NewReader(persisted)).Decode(&got))
+	assert.Equal(t, entries, got)
+}
+
+// legacyHistoryEntry is the exact persisted schema before SenderID was added.
+type legacyHistoryEntry struct {
+	ID           int
+	Time         time.Time
+	Author       string
+	Text         string
+	ReplyToID    int
+	FromBot      bool
+	PreFormatted bool
+}
+
+// spec: HIST-020
+func TestChatHistoryStorage_LoadLegacyPreservesUnknownAuthorship(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	stamp := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	legacy := []legacyHistoryEntry{
+		{ID: 1, Time: stamp, Author: "Alex", Text: "legacy"},
+		{
+			ID:           2,
+			Time:         stamp.Add(time.Second),
+			Author:       "@bot",
+			Text:         "<photo>old</photo>",
+			ReplyToID:    1,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}
+	var blob bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&blob).Encode(legacy))
+	_, err := conn.ExecContext(ctx, "insert into chat_history values (?, ?)", 42, blob.Bytes())
+	require.NoError(t, err)
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	got, err := storage.Load(ctx, 42)
+	require.NoError(t, err)
+	assert.Equal(t, []chathistory.Entry{
+		{ID: 1, Time: stamp, Author: "Alex", Text: "legacy"},
+		{
+			ID:           2,
+			Time:         stamp.Add(time.Second),
+			Author:       "@bot",
+			Text:         "<photo>old</photo>",
+			ReplyToID:    1,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}, got)
+}
+
+// spec: HIST-021
+func TestChatHistoryStorage_BufferRestartPreservesMixedHistory(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	stamp := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	var blob bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&blob).Encode([]legacyHistoryEntry{
+		{ID: 1, Time: stamp, Author: "Alex", Text: "legacy", ReplyToID: 50},
+	}))
+	_, err := conn.ExecContext(ctx, "insert into chat_history values (?, ?)", 42, blob.Bytes())
+	require.NoError(t, err)
+	buffer := chathistory.NewBuffer(
+		100,
+		chathistory.WithStore(NewChatHistoryStorage(NewConnGetter(conn))),
+	)
+	buffer.AddAll(
+		42,
+		chathistory.Entry{
+			ID:        2,
+			SenderID:  101,
+			Time:      stamp.Add(time.Second),
+			Author:    "Alex",
+			Text:      "first",
+			ReplyToID: 1,
+		},
+		chathistory.Entry{
+			ID:        3,
+			SenderID:  202,
+			Time:      stamp.Add(2 * time.Second),
+			Author:    "Alex",
+			Text:      "second",
+			ReplyToID: 2,
+		},
+	)
+	restarted := chathistory.NewBuffer(
+		100,
+		chathistory.WithStore(NewChatHistoryStorage(NewConnGetter(conn))),
+	)
+	assert.Equal(t, []chathistory.Entry{
+		{ID: 1, Time: stamp, Author: "Alex", Text: "legacy", ReplyToID: 50},
+		{
+			ID:        2,
+			SenderID:  101,
+			Time:      stamp.Add(time.Second),
+			Author:    "Alex",
+			Text:      "first",
+			ReplyToID: 1,
+		},
+		{
+			ID:        3,
+			SenderID:  202,
+			Time:      stamp.Add(2 * time.Second),
+			Author:    "Alex",
+			Text:      "second",
+			ReplyToID: 2,
+		},
+	}, restarted.Get(42))
+	// Loading a legacy chat after a populated new chat must not reuse its SenderID.
+	require.NoError(t, NewChatHistoryStorage(NewConnGetter(conn)).Save(ctx, 43,
+		[]chathistory.Entry{{ID: 10, SenderID: 999, Author: "Alex"}}))
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	_, err = storage.Load(ctx, 43)
+	require.NoError(t, err)
+	got, err := storage.Load(ctx, 42)
+	require.NoError(t, err)
+	assert.Zero(t, got[0].SenderID)
+}
+
+// spec: HIST-020
+// spec: HIST-021
+func TestChatHistoryStorage_NewGobReadableAfterRollback(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	stamp := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, storage.Save(ctx, 42, []chathistory.Entry{
+		{ID: 1, SenderID: 101, Time: stamp, Author: "Alex", Text: "first"},
+		{
+			ID:           2,
+			Time:         stamp.Add(time.Second),
+			Author:       "@bot",
+			Text:         "<photo>data</photo>",
+			ReplyToID:    1,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}))
+	var blob []byte
+	require.NoError(
+		t,
+		conn.GetContext(ctx, &blob, "select data from chat_history where chat_id = ?", 42),
+	)
+	var legacy []legacyHistoryEntry
+	require.NoError(t, gob.NewDecoder(bytes.NewReader(blob)).Decode(&legacy))
+	assert.Equal(t, []legacyHistoryEntry{
+		{ID: 1, Time: stamp, Author: "Alex", Text: "first"},
+		{
+			ID:           2,
+			Time:         stamp.Add(time.Second),
+			Author:       "@bot",
+			Text:         "<photo>data</photo>",
+			ReplyToID:    1,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}, legacy)
+	// A downgraded writer loses only the unknown new field. Upgrading again is safe.
+	var rewritten bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&rewritten).Encode(legacy))
+	_, err := conn.ExecContext(
+		ctx,
+		"update chat_history set data = ? where chat_id = ?",
+		rewritten.Bytes(),
+		42,
+	)
+	require.NoError(t, err)
+	restored, err := storage.Load(ctx, 42)
+	require.NoError(t, err)
+	assert.Equal(t, []chathistory.Entry{
+		{ID: 1, Time: stamp, Author: "Alex", Text: "first"},
+		{
+			ID:           2,
+			Time:         stamp.Add(time.Second),
+			Author:       "@bot",
+			Text:         "<photo>data</photo>",
+			ReplyToID:    1,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}, restored)
 }

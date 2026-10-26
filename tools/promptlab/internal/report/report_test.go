@@ -91,3 +91,52 @@ func TestRender_ContextTailIsBounded(t *testing.T) {
 	assert.Equal(t, contextTail, strings.Count(md, "\n> "))
 	assert.NotContains(t, md, "@a: m!\n")
 }
+
+func TestRenderTagTargetAndEveryRepetition(t *testing.T) {
+	t.Parallel()
+	cs := []cases.Case{
+		{
+			ID:     "synthetic-tag",
+			Kind:   cases.KindTag,
+			Target: &cases.Target{UserID: 901, Author: "@synthetic_target", Nickname: "Чайник"},
+			History: []cases.Entry{
+				{ID: 1, SenderID: 902, Author: "@synthetic_other", Text: "Общий фон"},
+				{ID: 2, FromBot: true, Text: "Ошибка старого бота"},
+			},
+		},
+	}
+	results := []Result{
+		{
+			CaseID:     "synthetic-tag",
+			Variant:    baseline,
+			Model:      model,
+			Repetition: 1,
+			Text:       "Первый уникальный ответ",
+		},
+		{
+			CaseID:     "synthetic-tag",
+			Variant:    baseline,
+			Model:      model,
+			Repetition: 2,
+			Err:        "уникальная ошибка API",
+		},
+		{
+			CaseID:     "synthetic-tag",
+			Variant:    baseline,
+			Model:      model,
+			Repetition: 3,
+			Text:       "Третий уникальный ответ",
+		},
+	}
+	md := Render(cs, []string{baseline}, []string{model}, results)
+	assert.Contains(t, md, "**Адресат:** @synthetic_target · ID `901` · кличка: Чайник")
+	assert.Contains(t, md, "@synthetic_other (sender_id=902): Общий фон")
+	assert.NotContains(t, md, "триггер")
+	assert.NotContains(t, md, "**В проде:**")
+	for _, text := range []string{"Первый уникальный ответ", "уникальная ошибка API", "Третий уникальный ответ"} {
+		assert.Equal(t, 1, strings.Count(md, text))
+	}
+	assert.Contains(t, md, "повтор 1")
+	assert.Contains(t, md, "повтор 2")
+	assert.Contains(t, md, "повтор 3")
+}

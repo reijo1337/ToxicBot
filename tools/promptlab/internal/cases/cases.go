@@ -1,5 +1,5 @@
-// Package cases описывает кейс для прогона: окно истории чата, в конце которого
-// бот в проде на что-то ответил. Ответ из прода сохраняется как точка отсчёта.
+// Package cases описывает окно истории для ответа или таймерного пинга.
+// Для извлечённых ответов сохраняется продовая реплика как точка отсчёта.
 package cases
 
 import (
@@ -13,18 +13,20 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 )
 
-// Kind — тип триггера; фото распознаётся по PreFormatted-записи от on_photo.
+// Kind — режим генерации: ответ на текст/фото или самостоятельный пинг.
 type Kind string
 
 const (
 	KindText  Kind = "text"
 	KindPhoto Kind = "photo"
+	KindTag   Kind = "tag"
 )
 
 // Entry — запись истории в JSON-фикстуре. Дублирует chathistory.Entry, чтобы
 // фикстура имела стабильные snake_case-поля, не зависящие от доменного типа.
 type Entry struct {
 	ID           int       `json:"id"`
+	SenderID     int64     `json:"sender_id,omitempty"`
 	Time         time.Time `json:"time"`
 	Author       string    `json:"author"`
 	Text         string    `json:"text"`
@@ -33,7 +35,15 @@ type Entry struct {
 	PreFormatted bool      `json:"pre_formatted,omitempty"`
 }
 
+// Target — адресат пинга; подпись и кличка не определяют авторство истории.
+type Target struct {
+	UserID   int64  `json:"user_id"`
+	Author   string `json:"author"`
+	Nickname string `json:"nickname"`
+}
+
 type Case struct {
+	Target  *Target `json:"target,omitempty"`
 	ID      string  `json:"id"`
 	ChatID  int64   `json:"chat_id"`
 	Kind    Kind    `json:"kind"`
@@ -56,6 +66,7 @@ func (c Case) DomainHistory() []chathistory.Entry {
 	for _, e := range c.History {
 		out = append(out, chathistory.Entry{
 			ID:           e.ID,
+			SenderID:     e.SenderID,
 			Time:         e.Time,
 			Author:       e.Author,
 			Text:         e.Text,
@@ -94,6 +105,7 @@ func FromHistory(chatID int64, entries []chathistory.Entry, minHistory int) []Ca
 		for _, h := range window {
 			c.History = append(c.History, Entry{
 				ID:           h.ID,
+				SenderID:     h.SenderID,
 				Time:         h.Time,
 				Author:       h.Author,
 				Text:         h.Text,
@@ -126,8 +138,9 @@ func Save(path string, cs []Case) error {
 	return nil
 }
 
+//nolint:gosec // путь фикстуры задаёт пользователь локального инструмента
 func Load(path string) ([]Case, error) {
-	raw, err := os.ReadFile(path) //nolint:gosec // путь задаёт пользователь инструмента
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("прочитать %s: %w", path, err)
 	}

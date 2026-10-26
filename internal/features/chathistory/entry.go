@@ -4,6 +4,7 @@ import "time"
 
 type Entry struct {
 	ID        int
+	SenderID  int64
 	Time      time.Time
 	Author    string
 	Text      string
