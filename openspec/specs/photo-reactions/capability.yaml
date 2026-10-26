@@ -2,6 +2,8 @@ prefix: PHOTO
 
 owns:
   - internal/handlers/on_photo
+  - internal/features/linkcontext/vision.go
+  - internal/features/linkcontext/limits.go
 
 scenarios:
   PHOTO-001: covered
@@ -27,3 +29,8 @@ scenarios:
   PHOTO-021: covered
   PHOTO-022: covered
   PHOTO-023: covered
+  PHOTO-024: covered
+  PHOTO-025: covered
+  PHOTO-026: covered
+  PHOTO-027: covered
+

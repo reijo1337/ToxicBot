@@ -1,0 +1,35 @@
+prefix: LINK
+
+owns:
+  - internal/features/linkcontext
+  - internal/infrastructure/linkpreview
+  - internal/telegram/linkextract
+
+scenarios:
+  LINK-001: covered
+  LINK-002: covered
+  LINK-003: covered
+  LINK-004: covered
+  LINK-005: covered
+  LINK-006: covered
+  LINK-007: covered
+  LINK-008: covered
+  LINK-009: covered
+  LINK-010: covered
+  LINK-011: covered
+  LINK-012: covered
+  LINK-013: covered
+  LINK-014: covered
+  LINK-015: covered
+  LINK-016: covered
+  LINK-017: covered
+  LINK-018: covered
+  LINK-019: covered
+  LINK-020: covered
+  LINK-021: covered
+  LINK-022: covered
+  LINK-023: covered
+  LINK-024: covered
+  LINK-025: covered
+  LINK-026: covered
+  LINK-027: covered

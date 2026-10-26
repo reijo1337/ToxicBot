@@ -107,7 +107,7 @@ func TestChatHistoryStorage_IsolatedByChat(t *testing.T) {
 	assert.Equal(t, "chat2", out2[0].Text)
 }
 
-// wireHistoryEntry models the new persisted format independently of Entry.
+// wireHistoryEntry models the persisted schema before link context was added.
 type wireHistoryEntry struct {
 	ID           int
 	SenderID     int64
@@ -334,4 +334,127 @@ func TestChatHistoryStorage_NewGobReadableAfterRollback(t *testing.T) {
 			PreFormatted: true,
 		},
 	}, restored)
+}
+
+// spec: HIST-023
+// spec: HIST-025
+func TestChatHistoryStorage_LinkSurvivesBufferRestart(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	first := chathistory.NewBuffer(
+		100,
+		chathistory.WithStore(NewChatHistoryStorage(NewConnGetter(conn))),
+	)
+	entry := chathistory.Entry{
+		ID: 10, SenderID: 101, Time: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC),
+		Author: "@alice", Text: "почитай тут", ReplyToID: 9,
+		Link: chathistory.Link{
+			URL: "https://example.com/article", Anchor: "почитай тут", Title: "Заголовок",
+			Description: "Описание материала", PreviewDescription: "Пересказ превью",
+		},
+	}
+	want := entry
+	first.Add(42, entry)
+	entry.Link.Anchor = "изменение входа"
+
+	restarted := chathistory.NewBuffer(
+		100,
+		chathistory.WithStore(NewChatHistoryStorage(NewConnGetter(conn))),
+	)
+	got := restarted.Get(42)
+	assert.Equal(t, []chathistory.Entry{want}, got)
+	got[0].Link.PreviewDescription = "изменение снимка"
+	assert.Equal(t, []chathistory.Entry{want}, restarted.Get(42))
+
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	persisted, err := storage.Load(context.Background(), 42)
+	require.NoError(t, err)
+	assert.Equal(t, []chathistory.Entry{want}, persisted)
+}
+
+// spec: HIST-024
+func TestChatHistoryStorage_PreLinkGobKeepsAuthorshipAndNoEnrichment(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	stamp := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	legacy := []wireHistoryEntry{
+		{
+			ID:        1,
+			SenderID:  101,
+			Time:      stamp,
+			Author:    "@alice",
+			Text:      "https://example.com/old",
+			ReplyToID: 9,
+		},
+		{
+			ID: 2, Time: stamp.Add(time.Second), Author: "@bot", Text: "old reply",
+			ReplyToID: 1, FromBot: true, PreFormatted: true,
+		},
+	}
+	var blob bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&blob).Encode(legacy))
+	_, err := conn.ExecContext(ctx, "insert into chat_history values (?, ?)", 42, blob.Bytes())
+	require.NoError(t, err)
+	buffer := chathistory.NewBuffer(
+		100,
+		chathistory.WithStore(NewChatHistoryStorage(NewConnGetter(conn))),
+	)
+	want := []chathistory.Entry{
+		{
+			ID:        1,
+			SenderID:  101,
+			Time:      stamp,
+			Author:    "@alice",
+			Text:      "https://example.com/old",
+			ReplyToID: 9,
+		},
+		{
+			ID: 2, Time: stamp.Add(time.Second), Author: "@bot", Text: "old reply",
+			ReplyToID: 1, FromBot: true, PreFormatted: true,
+		},
+	}
+	assert.Equal(t, want, buffer.Get(42))
+	assert.Equal(t, want, buffer.Get(42))
+}
+
+// spec: HIST-024
+func TestChatHistoryStorage_LinkGobReadableByPreviousVersion(t *testing.T) {
+	t.Parallel()
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	stamp := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	entry := chathistory.Entry{
+		ID: 1, SenderID: 101, Time: stamp, Author: "@alice", Text: "почитай тут", ReplyToID: 9,
+		Link: chathistory.Link{
+			URL: "https://example.com", Anchor: "почитай тут", Title: "Заголовок",
+			Description: "Описание", PreviewDescription: "Превью",
+		},
+	}
+	require.NoError(t, storage.Save(ctx, 42, []chathistory.Entry{entry}))
+	var blob []byte
+	require.NoError(
+		t,
+		conn.GetContext(ctx, &blob, "select data from chat_history where chat_id = ?", 42),
+	)
+	var previous []wireHistoryEntry
+	require.NoError(t, gob.NewDecoder(bytes.NewReader(blob)).Decode(&previous))
+	assert.Equal(t, []wireHistoryEntry{{
+		ID: 1, SenderID: 101, Time: stamp, Author: "@alice", Text: "почитай тут", ReplyToID: 9,
+	}}, previous)
+
+	var rewritten bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&rewritten).Encode(previous))
+	_, err := conn.ExecContext(
+		ctx,
+		"update chat_history set data = ? where chat_id = ?",
+		rewritten.Bytes(),
+		42,
+	)
+	require.NoError(t, err)
+	upgraded, err := storage.Load(ctx, 42)
+	require.NoError(t, err)
+	entry.Link = chathistory.Link{}
+	assert.Equal(t, []chathistory.Entry{entry}, upgraded)
 }

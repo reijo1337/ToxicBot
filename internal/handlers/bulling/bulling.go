@@ -11,8 +11,10 @@ import (
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
+	"github.com/reijo1337/ToxicBot/internal/features/linkcontext"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
+	"github.com/reijo1337/ToxicBot/internal/telegram/linkextract"
 	"github.com/reijo1337/ToxicBot/pkg/pointer"
 	"github.com/reijo1337/ToxicBot/pkg/tracing"
 	"go.opentelemetry.io/otel/attribute"
@@ -29,6 +31,7 @@ type Handler struct {
 	statIncer        statIncer
 	settingsProvider settingsProvider
 	history          historyBuffer
+	links            linkEnricher
 	replier          botReplier
 	r                *rand.Rand
 	msgCount         map[string]*list.List
@@ -36,6 +39,12 @@ type Handler struct {
 	botAuthor        string
 	muCount          sync.Mutex
 	muCooldown       sync.Mutex
+}
+
+type Option func(*Handler)
+
+func WithLinkEnricher(enricher linkEnricher) Option {
+	return func(h *Handler) { h.links = enricher }
 }
 
 func New(
@@ -46,8 +55,9 @@ func New(
 	historyBuffer historyBuffer,
 	replier botReplier,
 	botAuthor string,
+	opts ...Option,
 ) (*Handler, error) {
-	return &Handler{
+	h := &Handler{
 		ctx:              ctx,
 		generator:        generator,
 		statIncer:        statIncer,
@@ -58,7 +68,11 @@ func New(
 		cooldown:         make(map[string]time.Time),
 		r:                rand.New(rand.NewSource(time.Now().UnixNano())),
 		botAuthor:        botAuthor,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h, nil
 }
 
 func (b *Handler) Slug() string {
@@ -98,7 +112,6 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		ReplyToID: replyToID,
 		FromBot:   false,
 	}
-
 	settings, err := b.settingsProvider.GetForChat(b.ctx, chat.ID)
 	if err != nil {
 		return fmt.Errorf("can't get chat settings: %w", err)
@@ -114,6 +127,17 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		settings.ThresholdTime,
 	)
 	isReplyOrMention := isReplyOrMention(ctx)
+	var history []chathistory.Entry
+	if isReplyOrMention || (!isCooldown && isMsgThreshold) {
+		b.setCooldown(key, settings.Cooldown)
+		history = b.history.Get(chat.ID)
+	}
+	if b.links != nil {
+		ref := linkextract.First(msg.Text, msg.Entities)
+		if ref.URL != "" {
+			userEntry.Link = b.links.Enrich(spanCtx, chat.ID, linkcontext.Reference(ref))
+		}
+	}
 
 	if !isReplyOrMention {
 		if isCooldown || !isMsgThreshold {
@@ -128,15 +152,12 @@ func (b *Handler) Handle(ctx telebot.Context) error {
 		}
 	}
 
-	b.setCooldown(key, settings.Cooldown)
-
 	trigger := "threshold"
 	if isReplyOrMention {
 		trigger = "reply_or_mention"
 	}
 	span.SetAttributes(attribute.String("outcome", "react"), attribute.String("trigger", trigger))
 
-	history := b.history.Get(chat.ID)
 	history = append(history, userEntry)
 	result := b.generator.GetMessageTextWithHistory(
 		spanCtx,

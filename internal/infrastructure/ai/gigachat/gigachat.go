@@ -33,9 +33,10 @@ type Client struct {
 	authURL    string
 	baseURL    string
 
-	mu      sync.Mutex
-	token   string
-	tokenEx time.Time
+	tokenOnce sync.Once
+	tokenGate chan struct{}
+	token     string
+	tokenEx   time.Time
 }
 
 // OAuth token response.
@@ -144,8 +145,13 @@ func (c *Client) getToken(ctx context.Context) (string, error) {
 }
 
 func (c *Client) getTokenWithURL(ctx context.Context, tokenURL string) (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.tokenOnce.Do(func() { c.tokenGate = make(chan struct{}, 1) })
+	select {
+	case c.tokenGate <- struct{}{}:
+	case <-ctx.Done():
+		return "", fmt.Errorf("wait for token: %w", ctx.Err())
+	}
+	defer func() { <-c.tokenGate }()
 
 	if c.token != "" && time.Now().Before(c.tokenEx) {
 		return c.token, nil
@@ -313,7 +319,9 @@ func (c *Client) chatWithBaseURL(
 			if resp != nil {
 				resp.Body.Close() //nolint
 			}
-			time.Sleep(time.Duration(i+1) * time.Second)
+			if err := waitForRetry(ctx, time.Duration(i+1)*time.Second); err != nil {
+				return "", fmt.Errorf("wait for chat retry: %w", err)
+			}
 		}
 	}
 
@@ -346,6 +354,17 @@ func (c *Client) chatWithBaseURL(
 	}
 
 	return content, nil
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func newUUID() (string, error) {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -118,7 +119,9 @@ func TestClient_GenerateContent_Success(t *testing.T) {
 func TestClient_Chat_HTTPError(t *testing.T) {
 	t.Parallel()
 
+	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error": "internal server error"}`)) //nolint
 	}))
@@ -133,6 +136,7 @@ func TestClient_Chat_HTTPError(t *testing.T) {
 	assert.Empty(t, result)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "chat API error (status 500)")
+	assert.EqualValues(t, 4, requests.Load())
 }
 
 // spec: LLM-011

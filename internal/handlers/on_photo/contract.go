@@ -7,10 +7,15 @@ import (
 
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
+	"github.com/reijo1337/ToxicBot/internal/features/linkcontext"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
 	"gopkg.in/telebot.v3"
 )
+
+type linkEnricher interface {
+	Enrich(ctx context.Context, chatID int64, ref linkcontext.Reference) chathistory.Link
+}
 
 type imageDescriber interface {
 	GenerateContent(ctx context.Context, prompt string, imageBytes []byte) (string, error)

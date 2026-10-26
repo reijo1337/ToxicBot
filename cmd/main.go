@@ -14,6 +14,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/config"
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
+	"github.com/reijo1337/ToxicBot/internal/features/linkcontext"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
 	"github.com/reijo1337/ToxicBot/internal/features/phrase_filter"
 	"github.com/reijo1337/ToxicBot/internal/features/stats"
@@ -31,6 +32,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers/tagger"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/deepseek"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/ai/gigachat"
+	"github.com/reijo1337/ToxicBot/internal/infrastructure/linkpreview"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets/google_spreadsheet"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/storage/db"
@@ -134,6 +136,16 @@ func main() {
 			"can't create gigachat client",
 		)
 	}
+
+	linkLimits := linkcontext.NewLimits()
+	linkEnricher := linkcontext.New(
+		ctx,
+		linkpreview.New(linkLimits.AllowHTTP),
+		gigachatClient,
+		logger,
+		linkLimits,
+	)
+	defer linkEnricher.Close()
 
 	chatHistory := chathistory.NewBuffer(
 		50,
@@ -252,6 +264,7 @@ func main() {
 		chatHistory,
 		b,
 		botAuthor,
+		bulling.WithLinkEnricher(linkEnricher),
 	)
 	if err != nil {
 		logger.Fatal(
@@ -328,7 +341,7 @@ func main() {
 
 	onPhoto := on_photo.New(
 		ctx,
-		gigachatClient,
+		linkcontext.NewVision(gigachatClient, linkLimits),
 		generator,
 		settingsProvider,
 		chatHistory,
@@ -339,6 +352,7 @@ func main() {
 		statsIncer,
 		b.Me.ID,
 		botAuthor,
+		on_photo.WithLinkEnricher(linkEnricher),
 	)
 
 	taggerUsers, err := taggerusers.New(ctx, taggerUsersStorage)
