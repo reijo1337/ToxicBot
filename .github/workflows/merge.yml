@@ -1,0 +1,22 @@
+name: Merge gate
+
+on:
+  pull_request:
+    branches: [master]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  changes-archived:
+    name: changes-archived
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Все changes заархивированы
+        run: make spec-merge-check

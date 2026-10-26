@@ -4,6 +4,7 @@
 //
 //	specctl verify   — у каждого covered-сценария есть тест с якорем "// spec: <ID>"
 //	specctl orphan   — пакеты, не закреплённые ни за одной capability
+//	specctl ready    — все активные changes заархивированы перед merge
 //	specctl report   — сводка по покрытию и активным changes
 //	specctl cover    — сценарии одной capability со статусами
 //
@@ -30,7 +31,8 @@ const usage = `specctl — гейт соответствия спек, кода 
 
 Команды:
   verify    у каждого covered-сценария есть тест с якорем "// spec: <ID>"
-  drift     код capability изменён, а дельты в активном change нет
+  drift     код capability изменён, а дельты или обновлённой living spec нет
+  ready     нет активных changes, ветка готова к merge
   coverage  храповик: число непокрытых сценариев не выросло
   orphan    пакеты, не закреплённые ни за одной capability
   report    сводка по покрытию и активным changes
@@ -91,6 +93,20 @@ func run(args []string) error {
 
 func dispatch(ctx context.Context, command string, e env) error {
 	switch command {
+	case "ready":
+		if len(e.active) == 0 {
+			return nil
+		}
+
+		ids := make([]string, 0, len(e.active))
+		for _, c := range e.active {
+			ids = append(ids, c.ID)
+		}
+
+		return fmt.Errorf(
+			"перед merge заархивируйте changes: %s; make spec-archive name=<id>",
+			strings.Join(ids, ", "),
+		)
 	case "verify":
 		return emit(check.Verify(e.caps, e.anchors))
 	case "drift":

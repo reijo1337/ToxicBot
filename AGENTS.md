@@ -225,6 +225,7 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 | `make align` | Авто-выравнивание полей структур (`fieldalignment -fix`) |
 | `make spec-new name=<id>` | Создать change в `openspec/changes/` |
 | `make spec-check` | Гейт: структура спек, связь с кодом и тестами, храповик покрытия |
+| `make spec-merge-check` | Гейт перед merge: нет активных changes |
 | `make spec-status` | Покрытие по capability, активные changes, технический долг |
 | `make spec-cover cap=<имя>` | Сценарии одной capability со статусами |
 | `make spec-archive name=<id>` | Влить дельту в living specs и заархивировать change |
@@ -276,7 +277,8 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
   дождаться успешного CI. Архив завершённых предложений в репозитории не хранится: мотивация
   остаётся в истории коммитов, а долгоживущие решения уезжают ADR'ом в вику.
 - При ревью проверяется spec drift: изменение поведения без change, дельта не совпадает с кодом.
-  Отсутствие незаархивированного завершённого change проверяется непосредственно перед мержем.
+  Обязательная CI-проверка `changes-archived` запрещает merge в `master`, пока есть активные changes,
+  включая Lite без дельты. Во время ревью она остаётся красной до архивации; локально — `make spec-merge-check`.
 - Обход гейта — строка `[skip-spec: причина]` отдельной строкой в теле коммита; причина обязательна.
 
 ### Ветки и коммиты

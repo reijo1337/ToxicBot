@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/reijo1337/ToxicBot/tools/specctl/internal/spec"
@@ -24,7 +25,7 @@ type DriftInput struct {
 	SkipReasons []string
 }
 
-// Drift ищет изменения кода capability, не подкреплённые дельтой в активном change.
+// Drift ищет изменения кода capability без дельты в активном change или обновления living spec.
 func Drift(caps []spec.Capability, in DriftInput) []Finding {
 	out := emptySkipReasons(in.SkipReasons)
 	skipped := hasValidSkip(in.SkipReasons)
@@ -44,12 +45,16 @@ func Drift(caps []spec.Capability, in DriftInput) []Finding {
 			continue
 		}
 
+		if slices.Contains(in.Changed, "openspec/specs/"+c.Name+"/spec.md") {
+			continue
+		}
+
 		out = append(out, Finding{
 			Severity: severity,
 			Rule:     ruleDrift,
 			Location: c.Name,
 			Message: fmt.Sprintf(
-				"изменены файлы capability (%s), но ни один активный change не несёт на неё дельту",
+				"изменены файлы capability (%s), но нет ни дельты в активном change, ни обновлённой living spec",
 				joinLimit(files, maxListedFiles),
 			),
 		})
