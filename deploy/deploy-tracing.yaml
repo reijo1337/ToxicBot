@@ -39,6 +39,10 @@
         image: "jaegertracing/all-in-one:1.57"
         state: started
         restart_policy: always
+        log_driver: json-file
+        log_options:
+          max-size: "10m"
+          max-file: "3"
         networks:
           - name: toxicbot-tracing
             aliases:
@@ -74,6 +78,10 @@
         state: started
         recreate: yes
         restart_policy: always
+        log_driver: json-file
+        log_options:
+          max-size: "10m"
+          max-file: "3"
         networks:
           - name: toxicbot-tracing
         ports:

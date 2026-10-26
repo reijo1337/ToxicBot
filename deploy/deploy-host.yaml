@@ -1,0 +1,60 @@
+---
+
+- name: Configure host limits
+
+  become: yes
+  hosts: vscale_host
+
+  vars:
+    journal_max_use: 200M
+    swap_file: /swapfile
+    swap_size: 512M
+
+  tasks:
+    # без лимита журнал systemd вырастал до ~700M на диске в 6.9G
+    - name: Create journald drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/journald.conf.d
+        state: directory
+        mode: '0755'
+
+    - name: Limit journald disk usage
+      ansible.builtin.copy:
+        dest: /etc/systemd/journald.conf.d/size.conf
+        mode: '0644'
+        content: |
+          [Journal]
+          SystemMaxUse={{ journal_max_use }}
+      notify: Restart journald
+
+    # RAM всего ~700M без swap: при старте Jaeger глобальный OOM-killer мог зацепить и бота
+    - name: Allocate swap file
+      ansible.builtin.shell: "fallocate -l {{ swap_size }} {{ swap_file }} && chmod 600 {{ swap_file }}"
+      args:
+        creates: "{{ swap_file }}"
+      register: swap_allocated
+
+    - name: Format swap file
+      ansible.builtin.command: "mkswap {{ swap_file }}"
+      when: swap_allocated.changed
+
+    - name: Check active swap
+      ansible.builtin.command: swapon --show=NAME --noheadings
+      register: active_swap
+      changed_when: false
+      check_mode: false
+
+    - name: Enable swap file
+      ansible.builtin.command: "swapon {{ swap_file }}"
+      when: swap_file not in active_swap.stdout_lines
+
+    - name: Persist swap in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "{{ swap_file }} none swap sw 0 0"
+
+  handlers:
+    - name: Restart journald
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted

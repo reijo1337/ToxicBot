@@ -28,6 +28,10 @@
           - name: toxicbot-tracing
         volumes:
           - "/srv/ToxicBot/db:/toxicdb"
+        log_driver: json-file
+        log_options:
+          max-size: "10m"
+          max-file: "3"
         env:
           TELEGRAM_TOKEN: "{{ TELEGRAM_TOKEN }}"
           IGOR_ID: "{{ IGOR_ID }}"
@@ -44,8 +48,10 @@
           TRACING_ENABLED: "{{ TRACING_ENABLED }}"
           TRACING_OTLP_ENDPOINT: "jaeger:4317"
 
-    - name: Prune unused imagages
+    # удаляем и старые теги бота, а не только dangling: иначе они копятся (~50M на релиз);
+    # для отката нужный образ просто скачается заново
+    - name: Prune unused images
       community.docker.docker_prune:
         images: yes
         images_filters:
-          dangling: yes
+          dangling: no
