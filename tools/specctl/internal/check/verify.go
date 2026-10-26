@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -11,14 +12,18 @@ import (
 
 const ruleVerify = "verify"
 
-// Verify сверяет статусы покрытия сценариев с якорями в тестах.
-func Verify(caps []spec.Capability, found []anchors.Anchor) []Finding {
+// Verify сверяет статусы покрытия сценариев с якорями в тестах. pending — сценарии из дельт
+// активных changes: до архивации их нет в living specs, но якорь на них уже законен.
+func Verify(caps []spec.Capability, found []anchors.Anchor, pending map[string]struct{}) []Finding {
 	anchored := make(map[string][]anchors.Anchor, len(found))
 	for _, a := range found {
 		anchored[a.ScenarioID] = append(anchored[a.ScenarioID], a)
 	}
 
-	known := make(map[string]struct{})
+	known := maps.Clone(pending)
+	if known == nil {
+		known = make(map[string]struct{})
+	}
 
 	var out []Finding
 

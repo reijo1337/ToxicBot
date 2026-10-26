@@ -56,6 +56,49 @@ func TestActive_MissingDirIsEmpty(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestActive_CollectsDeltaScenarios(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mkChange(t, root, "fix-photo-loop", photoCap)
+	delta := "## ADDED Requirements\n\n### Requirement: Подпись к фото\n\n" +
+		"#### Scenario: [PHOTO-012] подпись есть\n- THEN x\n\n" +
+		"## MODIFIED Requirements\n\n### Requirement: Реакция\n\n" +
+		"#### Scenario: [PHOTO-003] своё фото\n- THEN y\n"
+	require.NoError(t, os.WriteFile(
+		filepath.Join(root, "fix-photo-loop", "specs", photoCap, "spec.md"), []byte(delta), 0o600,
+	))
+
+	got, err := Active(root)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, []string{"PHOTO-003", "PHOTO-012"}, got[0].Scenarios)
+}
+
+func TestActive_DeltaScenarioWithoutIDFails(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mkChange(t, root, "bad", photoCap)
+	delta := "## ADDED Requirements\n\n### Requirement: Р\n\n#### Scenario: без номера\n"
+	require.NoError(t, os.WriteFile(
+		filepath.Join(root, "bad", "specs", photoCap, "spec.md"), []byte(delta), 0o600,
+	))
+
+	_, err := Active(root)
+	require.Error(t, err)
+}
+
+func TestPendingScenarios(t *testing.T) {
+	t.Parallel()
+
+	got := PendingScenarios([]Change{
+		{ID: "a", Scenarios: []string{"PHOTO-012"}},
+		{ID: "b", Scenarios: []string{"HIST-020", "PHOTO-012"}},
+	})
+	assert.Equal(t, map[string]struct{}{"PHOTO-012": {}, "HIST-020": {}}, got)
+}
+
 func TestTouchedCapabilities(t *testing.T) {
 	t.Parallel()
 

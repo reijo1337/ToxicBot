@@ -16,7 +16,7 @@ A Go-based Telegram bot that trolls users in group chats. Combines text generati
 
 ```text
 cmd/main.go                              — entry point, dependency injection
-db/migrations/                           — SQLite SQL migrations (5 пар up/down)
+db/migrations/                           — SQLite SQL migrations (6 пар up/down)
 internal/
   config/config.go                       — env-based configuration (общие настройки бота)
   domain/chat/settings.go                — ChatSettings domain model
@@ -26,6 +26,7 @@ internal/
     message/                             — message generation engine (list-based + LLM, sanitize, history prompt)
     phrase_filter/                       — meaningfulness filter for AI
     stats/                               — statistics tracking with AES encryption
+    taggerusers/                         — реестр кандидатов теггера (память + синхронная запись в SQLite-таблицу `tagger_users`)
   handlers/
     contract.go                          — handler interfaces (для mockgen)
     handlers.go                          — handler dispatcher (parallel execution)
@@ -81,7 +82,9 @@ User-specific reactions for particular users (Igor — 1/750, Max — 1/200, Kir
 
 ### Tagger (`internal/handlers/tagger/`)
 
-Periodically tags a random chat member with an insult. Uses a priority queue (min-heap) for scheduling. Interval is randomized between `TAGGER_INTERVAL_FROM` and `TAGGER_INTERVAL_TO`.
+Periodically tags a random chat member with an insult. Uses a priority queue (min-heap) for scheduling, one job per non-empty chat. Interval is randomized between `TAGGER_INTERVAL_FROM` and `TAGGER_INTERVAL_TO`.
+
+Кандидаты (ID + подпись) копятся по сообщениям и событиям вступления/выхода, боты исключаются. Список держит реестр `internal/features/taggerusers`: он синхронно пишет изменения в SQLite-таблицу `tagger_users` до обновления памяти, а теггер получает его зависимостью через интерфейс. При старте весь список поднимается до создания теггера (ошибка чтения валит старт), каждому непустому чату назначается новый случайный интервал; время следующего пинга не сохраняется. Перед пингом выбранный кандидат проверяется через `getChatMember`: `left`/`kicked`/`restricted` без `is_member` удаляют запись, ошибка или неоднозначный ответ лишь пропускают пинг. Ответ `getChatMember` не применяется, если за время запроса пришло противоположное изменение (выход после проверки присутствия, подтверждение присутствия после проверки отсутствия); перед отправкой проверяется, что задача чата не сменилась, а кандидат остался в списке. При вступлении нескольких пользователей одним сообщением учитываются все из `UsersJoined`. Удаление бота из чата стирает весь чат. `/settings tagger off` глушит пинги чата: попытка пропускается до `getChatMember` и перепланируется, а сбор участников продолжается; ошибка чтения настроек теггер не выключает.
 
 ### Settings (`internal/handlers/settings/`)
 
@@ -146,6 +149,7 @@ LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaCha
 | `STICKER_SETS` | `static_bulling_by_stickersthiefbot` | Sticker packs (comma-separated) |
 | `TAGGER_INTERVAL_FROM` | 10h | Min tagger interval |
 | `TAGGER_INTERVAL_TO` | 24h | Max tagger interval |
+| `TAGGER_ENABLED` | true | Глобальное умолчание per-chat настройки `tagger` |
 | `TELEGRAM_LONG_POLL_TIMEOUT` | 10s | Long polling timeout |
 
 ### Data Refresh Periods
@@ -200,6 +204,7 @@ Stored in the `chat_settings` SQLite table. Cached by `chatsettings.Provider` wi
 | `voice_chance` | float 0.0-1.0 | 0.8 |
 | `ai_chance` | float 0.0-1.0 | 0.75 |
 | `photo_chance` | float 0.0-1.0 | 1 |
+| `tagger` (колонка `tagger_enabled`) | on/off | on (`TAGGER_ENABLED`) |
 
 ## Statistics and Analytics
 
@@ -259,7 +264,7 @@ Migrations run automatically on startup via `migrator.MigrateDB()`.
 |---|---|---|
 | Без спеки | опечатка, рефакторинг без смены поведения, зависимости, деплой, CI | PR-описание |
 | Lite | понятный баг, локальная правка хендлера, другой текст | `proposal.md` + `tasks.md`, дельта — если меняется ожидаемое поведение |
-| Полный | промпты и `sanitize`; вероятности и дефолты; миграции; формат `chat_settings`, `response_log`, `chat_history`; смена модели или её параметров; новый хендлер | proposal + дельта + `design.md` + `tasks.md` |
+| Полный | промпты и `sanitize`; вероятности и дефолты; миграции; формат `chat_settings`, `response_log`, `chat_history`, `tagger_users`; смена модели или её параметров; новый хендлер | proposal + дельта + `design.md` + `tasks.md` |
 
 Появился новый контракт (схема БД, формат промпта, внешний API) — режим поднимается до полного.
 

@@ -4,6 +4,7 @@ package tagger
 import (
 	"context"
 
+	"github.com/reijo1337/ToxicBot/internal/domain/chat"
 	"github.com/reijo1337/ToxicBot/internal/features/chathistory"
 	"github.com/reijo1337/ToxicBot/internal/features/chatsettings"
 	"github.com/reijo1337/ToxicBot/internal/features/message"
@@ -44,4 +45,14 @@ type statIncer interface {
 
 type settingsProvider interface {
 	GetForChat(ctx context.Context, chatID int64) (*chatsettings.Settings, error)
+}
+
+// userRegistry — список кандидатов: известные участники чатов с подписями.
+type userRegistry interface {
+	Chats() []int64
+	Users(chatID int64) []int64
+	Author(chatID, userID int64) (string, bool)
+	Add(ctx context.Context, user chat.TaggerUser) error
+	Remove(ctx context.Context, chatID, userID int64) error
+	RemoveChat(ctx context.Context, chatID int64) error
 }

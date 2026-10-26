@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/reijo1337/ToxicBot/tools/specctl/internal/spec"
 )
 
 const archiveDir = "archive"
@@ -17,6 +19,8 @@ type Change struct {
 	ID           string
 	Dir          string
 	Capabilities []string
+	// Scenarios — идентификаторы сценариев из дельт: до архивации их нет в living specs.
+	Scenarios []string
 }
 
 // Active перечисляет активные changes каталога root, отсортированные по идентификатору.
@@ -45,7 +49,12 @@ func Active(root string) ([]Change, error) {
 			return nil, capErr
 		}
 
-		out = append(out, Change{ID: e.Name(), Dir: dir, Capabilities: caps})
+		scenarios, scErr := deltaScenarios(dir, caps)
+		if scErr != nil {
+			return nil, scErr
+		}
+
+		out = append(out, Change{ID: e.Name(), Dir: dir, Capabilities: caps, Scenarios: scenarios})
 	}
 
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -84,6 +93,39 @@ func deltaCapabilities(changeDir string) ([]string, error) {
 	sort.Strings(out)
 
 	return out, nil
+}
+
+// deltaScenarios собирает идентификаторы сценариев из дельт перечисленных capability.
+func deltaScenarios(changeDir string, caps []string) ([]string, error) {
+	var out []string
+
+	for _, c := range caps {
+		parsed, err := spec.ParseFile(filepath.Join(changeDir, "specs", c, "spec.md"))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, s := range parsed {
+			out = append(out, s.ID)
+		}
+	}
+
+	sort.Strings(out)
+
+	return out, nil
+}
+
+// PendingScenarios собирает сценарии из дельт всех активных changes.
+func PendingScenarios(list []Change) map[string]struct{} {
+	out := make(map[string]struct{})
+
+	for _, c := range list {
+		for _, id := range c.Scenarios {
+			out[id] = struct{}{}
+		}
+	}
+
+	return out
 }
 
 // TouchedCapabilities отображает capability на идентификатор change, который её меняет.

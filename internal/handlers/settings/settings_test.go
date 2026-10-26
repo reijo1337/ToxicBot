@@ -116,6 +116,7 @@ func newTestHandler(t *testing.T, api *telegramAPI) (*Handler, *telebot.Bot, *pr
 	defaults := chatsettings.Defaults{
 		ThresholdCount: 5, ThresholdTime: time.Minute, Cooldown: time.Hour,
 		StickerReactChance: 0.4, VoiceReactChance: 0.8, AIChance: 0.75, PhotoReactChance: 1,
+		TaggerEnabled: true,
 	}
 	provider := &providerStub{settings: chatsettings.Settings(defaults)}
 	return New(provider, defaults), bot, provider
@@ -221,6 +222,7 @@ func TestHandle_ShowOverrides(t *testing.T) {
 
 // spec: SET-008
 // spec: SET-013
+// spec: SET-024
 func TestHandle_AdminInvalidValues(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ text, example string }{
@@ -234,6 +236,8 @@ func TestHandle_AdminInvalidValues(t *testing.T) {
 		{"/settings voice_chance -0.1", "Пример: 0.8"},
 		{"/settings ai_chance invalid", "Пример: 0.75"},
 		{"/settings photo_chance 1.1", "Пример: 0.5"},
+		{"/settings tagger yes", "Пример: /settings tagger off"},
+		{"/settings tagger ON", "Пример: /settings tagger off"},
 	} {
 		t.Run(tc.text, func(t *testing.T) {
 			t.Parallel()
@@ -514,4 +518,67 @@ func TestHandle_PhotoChanceDefaultDisplay(t *testing.T) {
 	calls := api.calls()
 	require.Len(t, calls, 2)
 	assert.Contains(t, calls[1].params["text"], "photo_chance: 1.00 (по умолчанию: 1.00)")
+}
+
+// spec: SET-023
+func TestHandle_TaggerToggle(t *testing.T) {
+	t.Parallel()
+	for value, want := range map[string]bool{"off": false, "on": true} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+			api := &telegramAPI{}
+			h, bot, provider := newTestHandler(t, api)
+			require.NoError(
+				t,
+				runCommand(h, bot, command("/settings tagger "+value, telebot.ChatSuperGroup)),
+			)
+			require.Len(t, provider.calls, 1)
+			assert.Equal(t, "upsert", provider.calls[0].method)
+			require.NotNil(t, provider.calls[0].partial.TaggerEnabled)
+			assert.Equal(t, want, *provider.calls[0].partial.TaggerEnabled)
+			calls := api.calls()
+			require.Len(t, calls, 2)
+			assert.Contains(t, calls[1].params["text"], "tagger = "+value)
+		})
+	}
+}
+
+// spec: SET-025
+func TestHandle_TaggerDisplay(t *testing.T) {
+	t.Parallel()
+	for enabled, line := range map[bool]string{
+		true:  "tagger: on (по умолчанию: on)",
+		false: "tagger: off (по умолчанию: on)",
+	} {
+		t.Run(line, func(t *testing.T) {
+			t.Parallel()
+			api := &telegramAPI{}
+			h, bot, provider := newTestHandler(t, api)
+			provider.settings.TaggerEnabled = enabled
+			require.NoError(t, runCommand(h, bot, command("/settings", telebot.ChatSuperGroup)))
+			calls := api.calls()
+			require.Len(t, calls, 2)
+			assert.Contains(t, calls[1].params["text"], line)
+		})
+	}
+
+	api := &telegramAPI{}
+	h, bot, _ := newTestHandler(t, api)
+	require.NoError(t, runCommand(h, bot, command("/settings help", telebot.ChatSuperGroup)))
+	assert.Contains(t, api.calls()[1].params["text"], "tagger (on / off)")
+}
+
+// spec: SET-026
+func TestHandle_TaggerDisplayGlobalDefault(t *testing.T) {
+	t.Parallel()
+	api := &telegramAPI{}
+	h, bot, provider := newTestHandler(t, api)
+	h.defaults.TaggerEnabled = false
+	provider.settings.TaggerEnabled = false
+
+	require.NoError(t, runCommand(h, bot, command("/settings", telebot.ChatSuperGroup)))
+
+	calls := api.calls()
+	require.Len(t, calls, 2)
+	assert.Contains(t, calls[1].params["text"], "tagger: off (по умолчанию: off)")
 }

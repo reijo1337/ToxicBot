@@ -16,6 +16,7 @@ type Defaults struct {
 	VoiceReactChance   float32
 	AIChance           float32
 	PhotoReactChance   float32
+	TaggerEnabled      bool
 }
 
 type Settings struct {
@@ -26,6 +27,7 @@ type Settings struct {
 	VoiceReactChance   float32
 	AIChance           float32
 	PhotoReactChance   float32
+	TaggerEnabled      bool
 }
 
 type repository interface {
@@ -119,6 +121,7 @@ func (p *Provider) merge(chatSettings *chat.ChatSettings) *Settings {
 		VoiceReactChance:   p.defaults.VoiceReactChance,
 		AIChance:           p.defaults.AIChance,
 		PhotoReactChance:   p.defaults.PhotoReactChance,
+		TaggerEnabled:      p.defaults.TaggerEnabled,
 	}
 
 	if chatSettings == nil {
@@ -151,6 +154,10 @@ func (p *Provider) merge(chatSettings *chat.ChatSettings) *Settings {
 
 	if chatSettings.PhotoReactChance != nil {
 		out.PhotoReactChance = *chatSettings.PhotoReactChance
+	}
+
+	if chatSettings.TaggerEnabled != nil {
+		out.TaggerEnabled = *chatSettings.TaggerEnabled
 	}
 
 	return out

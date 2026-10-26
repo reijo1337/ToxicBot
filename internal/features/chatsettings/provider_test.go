@@ -87,3 +87,48 @@ func TestProvider_ResetPhotoChance(t *testing.T) {
 		})
 	}
 }
+
+// spec: SET-025
+func TestProvider_TaggerEnabledByDefault(t *testing.T) {
+	t.Parallel()
+
+	repo := &settingsRepository{settings: map[int64]chat.ChatSettings{
+		1: {ThresholdCount: ptr(7)},
+		2: {TaggerEnabled: ptr(false)},
+		3: {TaggerEnabled: ptr(true)},
+	}}
+	p := NewProvider(repo, Defaults{TaggerEnabled: true})
+
+	for chatID, want := range map[int64]bool{0: true, 1: true, 2: false, 3: true} {
+		s, err := p.GetForChat(t.Context(), chatID)
+		require.NoError(t, err)
+		assert.Equal(t, want, s.TaggerEnabled, "chat %d", chatID)
+	}
+
+	require.NoError(t, p.ResetChat(t.Context(), 2))
+	s, err := p.GetForChat(t.Context(), 2)
+	require.NoError(t, err)
+	assert.True(t, s.TaggerEnabled, "сброс возвращает on")
+}
+
+// spec: SET-026
+func TestProvider_TaggerDefaultFromGlobalSettings(t *testing.T) {
+	t.Parallel()
+
+	repo := &settingsRepository{settings: map[int64]chat.ChatSettings{
+		1: {ThresholdCount: ptr(7)},
+		2: {TaggerEnabled: ptr(true)},
+	}}
+	p := NewProvider(repo, Defaults{TaggerEnabled: false})
+
+	for chatID, want := range map[int64]bool{0: false, 1: false, 2: true} {
+		s, err := p.GetForChat(t.Context(), chatID)
+		require.NoError(t, err)
+		assert.Equal(t, want, s.TaggerEnabled, "chat %d", chatID)
+	}
+
+	require.NoError(t, p.ResetChat(t.Context(), 2))
+	s, err := p.GetForChat(t.Context(), 2)
+	require.NoError(t, err)
+	assert.False(t, s.TaggerEnabled, "сброс возвращает глобальное значение")
+}
