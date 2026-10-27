@@ -18,7 +18,7 @@ const (
 
 var prefixPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)
 
-// Capability — living spec одной способности бота вместе с метаданными.
+// Capability — сценарии одной способности бота вместе с метаданными.
 type Capability struct {
 	Scenarios map[string]Coverage `yaml:"scenarios"`
 	Notes     map[string]string   `yaml:"notes"`
@@ -44,6 +44,10 @@ func (c Capability) DebtCount() int {
 
 // LoadCapability читает capability.yaml и spec.md из каталога dir и сверяет их между собой.
 func LoadCapability(dir string) (Capability, error) {
+	return loadCapability(dir, nil)
+}
+
+func loadCapability(dir string, deltas []Scenario) (Capability, error) {
 	metaPath := filepath.Join(dir, metaFile)
 
 	//nolint:gosec // путь приходит из обхода openspec/specs
@@ -61,14 +65,37 @@ func LoadCapability(dir string) (Capability, error) {
 	c.Dir = dir
 
 	if c.Specs, err = ParseFile(filepath.Join(dir, specFile)); err != nil {
-		return Capability{}, err
+		if !errors.Is(err, os.ErrNotExist) || len(deltas) == 0 {
+			return Capability{}, err
+		}
 	}
+
+	c.Specs = unionScenarios(c.Specs, deltas)
 
 	if err = c.validate(); err != nil {
 		return Capability{}, fmt.Errorf("%s: %w", c.Name, err)
 	}
 
 	return c, nil
+}
+
+func unionScenarios(living, deltas []Scenario) []Scenario {
+	seen := make(map[string]struct{}, len(living)+len(deltas))
+
+	for _, s := range living {
+		seen[s.ID] = struct{}{}
+	}
+
+	for _, s := range deltas {
+		if _, ok := seen[s.ID]; ok {
+			continue
+		}
+
+		living = append(living, s)
+		seen[s.ID] = struct{}{}
+	}
+
+	return living
 }
 
 func (c Capability) validate() error {
@@ -105,7 +132,7 @@ func (c Capability) validateScenarios() error {
 	return nil
 }
 
-// validateSymmetry следит, чтобы spec.md и capability.yaml описывали один и тот же набор сценариев.
+// validateSymmetry сверяет capability.yaml с объединением living spec и активных дельт.
 func (c Capability) validateSymmetry() error {
 	inSpec := make(map[string]struct{}, len(c.Specs))
 
@@ -131,12 +158,18 @@ func (c Capability) validateSymmetry() error {
 
 // LoadAll читает все capability из каталога root, отсортированные по имени.
 func LoadAll(root string) ([]Capability, error) {
+	return LoadAllWithDeltas(root, nil)
+}
+
+// LoadAllWithDeltas сверяет метаданные с living specs и активными дельтами той же capability.
+func LoadAllWithDeltas(root string, deltas map[string][]Scenario) ([]Capability, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, fmt.Errorf("читать %s: %w", root, err)
 	}
 
 	var out []Capability
+	loaded := make(map[string]struct{}, len(entries))
 
 	for _, e := range entries {
 		if !e.IsDir() {
@@ -144,19 +177,30 @@ func LoadAll(root string) ([]Capability, error) {
 		}
 
 		dir := filepath.Join(root, e.Name())
-		if _, err = os.Stat(filepath.Join(dir, metaFile)); err != nil {
-			continue
+		if _, err = os.Stat(filepath.Join(dir, metaFile)); errors.Is(err, os.ErrNotExist) {
+			if len(deltas[e.Name()]) == 0 {
+				continue
+			}
 		}
 
-		c, loadErr := LoadCapability(dir)
+		c, loadErr := loadCapability(dir, deltas[e.Name()])
 		if loadErr != nil {
 			return nil, loadErr
 		}
 
 		out = append(out, c)
+		loaded[c.Name] = struct{}{}
 	}
 
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	for name := range deltas {
+		if _, ok := loaded[name]; !ok {
+			return nil, fmt.Errorf("нет capability.yaml для capability %s из активной дельты", name)
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Name < out[j].Name
+	})
 
 	if err = checkCollisions(out); err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -13,7 +14,7 @@ const (
 )
 
 // formatUserContent рендерит одну user-запись из истории в виде
-// `<msg from="@..." time="..." [reply_to="@..."] [now="true"]>текст</msg>`.
+// `<msg id="..." from="@..." time="..." [reply_to="@..."] [now="true"]>текст</msg>`.
 // Авторство теперь явно передаётся через атрибут from= внутри тела сообщения;
 // LLMMessage.Name при этом сохраняется. Тело санируется для защиты от подделки
 // тегов, если только запись не помечена как PreFormatted (уже-XML от photo-хендлера).
@@ -26,7 +27,7 @@ const (
 // начала воспроизводить обёртку в своих ответах.
 func formatUserContent(e chathistory.Entry, history []chathistory.Entry, isTrigger bool) string {
 	var b strings.Builder
-	b.WriteString(`<msg from="`)
+	fmt.Fprintf(&b, `<msg id="%d" from="`, e.ID)
 	b.WriteString(sanitizeAttr(e.Author))
 	b.WriteString(`" time="`)
 	// timestamp всегда в UTC, чтобы промпт не зависел от TZ хоста.
@@ -84,40 +85,41 @@ func buildChatCompletions(
 	history []chathistory.Entry,
 	mode generationMode,
 ) []LLMMessage {
-	// The buffer preserves Add/AddAll insertion order, which diverges from
-	// chronological order: telebot processes updates concurrently and the bulling
-	// /photo handlers defer AddAll until after a slow LLM call. Sort by Time so the
-	// model sees a coherent transcript; ID (monotonic per chat) breaks same-second
-	// ties since Telegram timestamps have only second resolution.
-	sorted := make([]chathistory.Entry, len(history))
-	copy(sorted, history)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		if !sorted[i].Time.Equal(sorted[j].Time) {
-			return sorted[i].Time.Before(sorted[j].Time)
-		}
-		return sorted[i].ID < sorted[j].ID
-	})
-
-	// В ответе последняя user-реплика — триггер; при пинге вся история — контекст.
-	triggerIdx := -1
+	sorted := orderedHistory(history)
+	entries := withoutLeadingBotEntries(sorted)
+	assistantTurns := make(map[int]int)
 	if mode == replyGeneration {
-		for i := len(sorted) - 1; i >= 0; i-- {
-			if !sorted[i].FromBot {
-				triggerIdx = i
-				break
+		turn := 0
+
+		for _, entry := range entries {
+			if entry.Reaction == nil && entry.FromBot {
+				turn++
+				assistantTurns[entry.ID] = turn
 			}
 		}
 	}
 
-	msgs := make([]LLMMessage, 0, len(sorted)+1)
-	msgs = append(msgs, LLMMessage{Role: RoleSystem, Content: system})
+	// В ответе последняя user-реплика — триггер; при пинге вся история — контекст.
+	triggerIdx := -1
+	if mode == replyGeneration {
+		triggerIdx = lastUserMessageIndex(entries)
+	}
 
-	skipping := true
-	for i, e := range sorted {
-		if skipping && e.FromBot {
+	msgs := make([]LLMMessage, 0, len(sorted)+1)
+	msgs = append(msgs, LLMMessage{
+		Role:    RoleSystem,
+		Content: system,
+	})
+
+	for i, e := range entries {
+		if e.Reaction != nil {
+			msgs = append(msgs, LLMMessage{
+				Role:    RoleUser,
+				Content: formatReaction(e, sorted, assistantTurns[e.Reaction.MessageID]),
+			})
+
 			continue
 		}
-		skipping = false
 
 		if e.FromBot {
 			msgs = append(msgs, LLMMessage{
@@ -125,6 +127,7 @@ func buildChatCompletions(
 				Name:    e.Author,
 				Content: SanitizeText(e.Text, maxEntryRunes),
 			})
+
 			continue
 		}
 
@@ -136,4 +139,55 @@ func buildChatCompletions(
 	}
 
 	return msgs
+}
+
+func withoutLeadingBotEntries(history []chathistory.Entry) []chathistory.Entry {
+	entries := make([]chathistory.Entry, 0, len(history))
+	skipping := true
+
+	for _, entry := range history {
+		if entry.Reaction == nil {
+			if skipping && entry.FromBot {
+				continue
+			}
+
+			skipping = false
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+func orderedHistory(history []chathistory.Entry) []chathistory.Entry {
+	sorted := append([]chathistory.Entry(nil), history...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		a, b := sorted[i], sorted[j]
+		if !a.Time.Equal(b.Time) {
+			return a.Time.Before(b.Time)
+		}
+
+		if a.Reaction == nil && b.Reaction == nil {
+			return a.ID < b.ID
+		}
+
+		if a.Reaction == nil || b.Reaction == nil {
+			return a.Reaction == nil
+		}
+
+		return a.Reaction.UpdateID < b.Reaction.UpdateID
+	})
+
+	return sorted
+}
+
+func lastUserMessageIndex(history []chathistory.Entry) int {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Reaction == nil && !history[i].FromBot {
+			return i
+		}
+	}
+
+	return -1
 }

@@ -458,3 +458,331 @@ func TestChatHistoryStorage_LinkGobReadableByPreviousVersion(t *testing.T) {
 	entry.Link = chathistory.Link{}
 	assert.Equal(t, []chathistory.Entry{entry}, upgraded)
 }
+
+const (
+	changedReactionInput    = "changed input"
+	changedReactionSnapshot = "changed snapshot"
+)
+
+// preReactionHistoryEntry models the schema with link context and without reactions.
+type preReactionHistoryEntry struct {
+	ID           int
+	SenderID     int64
+	Time         time.Time
+	Author       string
+	Text         string
+	Link         chathistory.Link
+	ReplyToID    int
+	FromBot      bool
+	PreFormatted bool
+}
+
+// spec: HIST-029
+func TestChatHistoryStorage_PreReactionGobPreservesMessages(t *testing.T) {
+	t.Parallel()
+
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	stamp := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+
+	var blob bytes.Buffer
+
+	require.NoError(t, gob.NewEncoder(&blob).Encode([]preReactionHistoryEntry{
+		{
+			ID:        10,
+			SenderID:  101,
+			Time:      stamp,
+			Author:    "alice",
+			Text:      "read this",
+			ReplyToID: 9,
+			Link: chathistory.Link{
+				URL:                "https://example.com/article",
+				Anchor:             "read this",
+				Title:              "Article",
+				Description:        "Description",
+				PreviewDescription: "Preview",
+			},
+		},
+		{
+			ID:           11,
+			Time:         stamp.Add(time.Second),
+			Author:       "bot",
+			Text:         "<photo>picture</photo>",
+			ReplyToID:    10,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}))
+
+	_, err := conn.ExecContext(ctx, "insert into chat_history values (?, ?)", 42, blob.Bytes())
+
+	require.NoError(t, err)
+
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	got, err := storage.Load(ctx, 42)
+
+	require.NoError(t, err)
+	assert.Equal(t, []chathistory.Entry{
+		{
+			ID:        10,
+			SenderID:  101,
+			Time:      stamp,
+			Author:    "alice",
+			Text:      "read this",
+			ReplyToID: 9,
+			Link: chathistory.Link{
+				URL:                "https://example.com/article",
+				Anchor:             "read this",
+				Title:              "Article",
+				Description:        "Description",
+				PreviewDescription: "Preview",
+			},
+		},
+		{
+			ID:           11,
+			Time:         stamp.Add(time.Second),
+			Author:       "bot",
+			Text:         "<photo>picture</photo>",
+			ReplyToID:    10,
+			FromBot:      true,
+			PreFormatted: true,
+		},
+	}, got)
+}
+
+// spec: HIST-028
+// spec: HIST-031
+func TestChatHistoryStorage_ReactionSurvivesMixedWindowRestartAndDuplicate(t *testing.T) {
+	t.Parallel()
+
+	conn := setupChatHistoryDB(t)
+	ctx := context.Background()
+	stamp := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+
+	var blob bytes.Buffer
+
+	require.NoError(t, gob.NewEncoder(&blob).Encode([]preReactionHistoryEntry{
+		{
+			ID:     1,
+			Author: "legacy",
+			Text:   "oldest",
+		},
+		{
+			ID:        2,
+			SenderID:  99,
+			Author:    "legacy",
+			Text:      "kept",
+			ReplyToID: 1,
+		},
+	}))
+
+	_, err := conn.ExecContext(ctx, "insert into chat_history values (?, ?)", 42, blob.Bytes())
+
+	require.NoError(t, err)
+
+	storage := NewChatHistoryStorage(NewConnGetter(conn))
+	buffer := chathistory.NewBuffer(4, chathistory.WithStore(storage))
+	buffer.Add(
+		42,
+		chathistory.Entry{
+			ID:       10,
+			SenderID: 101,
+			Time:     stamp,
+			Author:   "alice",
+			Text:     "target",
+		},
+	)
+	event := chathistory.Entry{
+		Time: stamp.Add(time.Second),
+		Reaction: &chathistory.Reaction{
+			UpdateID:  70,
+			MessageID: 10,
+			ActorID:   202,
+			Actor:     "bob",
+			Added: []chathistory.ReactionType{
+				{
+					Type:  "emoji",
+					Value: "👍",
+				},
+				{
+					Type:  "custom_emoji",
+					Value: "123",
+				},
+				{
+					Type: "paid",
+				},
+			},
+			Removed: []chathistory.ReactionType{
+				{
+					Type:  "emoji",
+					Value: "👎",
+				},
+			},
+		},
+	}
+
+	require.NoError(t, buffer.AddReaction(ctx, 42, event))
+
+	buffer.Add(42, chathistory.Entry{
+		ID:        11,
+		Time:      stamp.Add(2 * time.Second),
+		Author:    "bot",
+		Text:      "answer",
+		ReplyToID: 10,
+		FromBot:   true,
+	})
+
+	restartedStore := &countingReactionStore{
+		ChatHistoryStorage: NewChatHistoryStorage(NewConnGetter(conn)),
+	}
+
+	restarted := chathistory.NewBuffer(4, chathistory.WithStore(restartedStore))
+
+	require.NoError(t, restarted.AddReaction(ctx, 42, event))
+
+	assert.Zero(t, restartedStore.saves, "a duplicate loaded from SQLite must not call Save")
+	assert.Equal(t, []chathistory.Entry{
+		{
+			ID:        2,
+			SenderID:  99,
+			Author:    "legacy",
+			Text:      "kept",
+			ReplyToID: 1,
+		},
+		{
+			ID:       10,
+			SenderID: 101,
+			Time:     stamp,
+			Author:   "alice",
+			Text:     "target",
+		},
+		{
+			Time: stamp.Add(time.Second),
+			Reaction: &chathistory.Reaction{
+				UpdateID:  70,
+				MessageID: 10,
+				ActorID:   202,
+				Actor:     "bob",
+				Added: []chathistory.ReactionType{
+					{
+						Type:  "emoji",
+						Value: "👍",
+					},
+					{
+						Type:  "custom_emoji",
+						Value: "123",
+					},
+					{
+						Type: "paid",
+					},
+				},
+				Removed: []chathistory.ReactionType{
+					{
+						Type:  "emoji",
+						Value: "👎",
+					},
+				},
+				TargetKnown:    true,
+				TargetSenderID: 101,
+				TargetAuthor:   "alice",
+			},
+		},
+		{
+			ID:        11,
+			Time:      stamp.Add(2 * time.Second),
+			Author:    "bot",
+			Text:      "answer",
+			ReplyToID: 10,
+			FromBot:   true,
+		},
+	}, restarted.Get(42))
+}
+
+// spec: HIST-028
+// spec: HIST-030
+func TestChatHistoryStorage_ReactionValuesAreIndependent(t *testing.T) {
+	t.Parallel()
+
+	storage := NewChatHistoryStorage(NewConnGetter(setupChatHistoryDB(t)))
+	ctx := context.Background()
+	entry := chathistory.Entry{
+		Reaction: &chathistory.Reaction{
+			UpdateID:  70,
+			MessageID: 10,
+			ActorID:   202,
+			Actor:     "bob",
+			Added: []chathistory.ReactionType{
+				{
+					Type:  "emoji",
+					Value: "👍",
+				},
+			},
+			Removed: []chathistory.ReactionType{
+				{
+					Type:  "custom_emoji",
+					Value: "123",
+				},
+			},
+		},
+	}
+
+	require.NoError(t, storage.Save(ctx, 42, []chathistory.Entry{entry}))
+
+	entry.Reaction.Actor = changedReactionInput
+	entry.Reaction.Added[0].Value = changedReactionInput
+	entry.Reaction.Removed[0].Value = changedReactionInput
+	first, err := storage.Load(ctx, 42)
+
+	require.NoError(t, err)
+
+	second, err := storage.Load(ctx, 42)
+
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+
+	first[0].Reaction.Actor = changedReactionSnapshot
+	first[0].Reaction.Added[0].Value = changedReactionSnapshot
+	first[0].Reaction.Removed[0].Value = changedReactionSnapshot
+	third, err := storage.Load(ctx, 42)
+
+	require.NoError(t, err)
+	assert.Equal(t, []chathistory.Entry{
+		{
+			Reaction: &chathistory.Reaction{
+				UpdateID:  70,
+				MessageID: 10,
+				ActorID:   202,
+				Actor:     "bob",
+				Added: []chathistory.ReactionType{
+					{
+						Type:  "emoji",
+						Value: "👍",
+					},
+				},
+				Removed: []chathistory.ReactionType{
+					{
+						Type:  "custom_emoji",
+						Value: "123",
+					},
+				},
+			},
+		},
+	}, second)
+	assert.Equal(t, second, third)
+}
+
+type countingReactionStore struct {
+	*ChatHistoryStorage
+
+	saves int
+}
+
+func (s *countingReactionStore) Save(
+	ctx context.Context,
+	chatID int64,
+	entries []chathistory.Entry,
+) error {
+	s.saves++
+
+	return s.ChatHistoryStorage.Save(ctx, chatID, entries)
+}

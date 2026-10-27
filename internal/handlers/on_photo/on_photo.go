@@ -405,11 +405,20 @@ func channelDisplay(c *telebot.Chat) string {
 // The input slice is never mutated.
 func dropBotEntries(history []chathistory.Entry) []chathistory.Entry {
 	out := make([]chathistory.Entry, 0, len(history))
+
 	for _, e := range history {
 		if e.FromBot {
 			continue
 		}
+
+		if e.Reaction != nil && !e.Reaction.TargetKnown {
+			// Keep available authorship before removing the target's bot text.
+			reaction := e.Reaction.ResolveTarget(history)
+			e.Reaction = &reaction
+		}
+
 		out = append(out, e)
 	}
+
 	return out
 }

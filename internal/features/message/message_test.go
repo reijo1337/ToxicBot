@@ -33,6 +33,7 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 		Chat(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, msgs ...LLMMessage) (string, error) {
 			captured = msgs
+
 			return "ответ", nil
 		})
 
@@ -82,7 +83,7 @@ func TestGenerator_WithHistory_SendsChatCompletionsShape(t *testing.T) {
 	assert.Equal(t, "@alice", captured[3].Name)
 	assert.Equal(
 		t,
-		`<msg from="@alice" time="2026-04-24T14:00" reply_to="бот" now="true">йо</msg>`,
+		`<msg id="3" from="@alice" time="2026-04-24T14:00" reply_to="бот" now="true">йо</msg>`,
 		captured[3].Content,
 	)
 }

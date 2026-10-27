@@ -22,6 +22,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/handlers"
 	"github.com/reijo1337/ToxicBot/internal/handlers/bulling"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_photo"
+	"github.com/reijo1337/ToxicBot/internal/handlers/on_reaction"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_sticker"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_join"
 	"github.com/reijo1337/ToxicBot/internal/handlers/on_user_left"
@@ -36,6 +37,7 @@ import (
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/sheets/google_spreadsheet"
 	"github.com/reijo1337/ToxicBot/internal/infrastructure/storage/db"
+	"github.com/reijo1337/ToxicBot/internal/infrastructure/telegram"
 	"github.com/reijo1337/ToxicBot/pkg/logger"
 	"github.com/reijo1337/ToxicBot/pkg/migrator"
 	"github.com/reijo1337/ToxicBot/pkg/tracing"
@@ -43,6 +45,8 @@ import (
 )
 
 var AesKeyString string
+
+const defaultHistorySize = 100
 
 func main() {
 	logger := logger.New(
@@ -76,6 +80,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(logger.WithError(ctx, err), "can't init tracing")
 	}
+
 	defer func() {
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelShutdown()
@@ -145,10 +150,11 @@ func main() {
 		logger,
 		linkLimits,
 	)
+
 	defer linkEnricher.Close()
 
 	chatHistory := chathistory.NewBuffer(
-		50,
+		defaultHistorySize,
 		chathistory.WithStore(chatHistoryStorage),
 		chathistory.WithLogger(logger),
 	)
@@ -190,9 +196,11 @@ func main() {
 
 	settingsProvider := chatsettings.NewProvider(chatSettingsStorage, settingsDefaults)
 
+	telegramPoller := newTelegramPoller(cfg.TelegramLongPollTimeout, chatHistory, logger)
 	pref := telebot.Settings{
 		Token:  cfg.TelegramToken,
-		Poller: &telebot.LongPoller{Timeout: cfg.TelegramLongPollTimeout},
+		Poller: telegramPoller,
+		Client: telegramPoller.Client(nil),
 		OnError: func(err error, ctx telebot.Context) {
 			logger.Error(
 				logger.WithField(
@@ -346,7 +354,9 @@ func main() {
 		settingsProvider,
 		chatHistory,
 		b,
-		&botFileReader{bot: b},
+		&botFileReader{
+			bot: b,
+		},
 		b,
 		logger,
 		statsIncer,
@@ -491,6 +501,14 @@ func getStickersFromPacks(bot *telebot.Bot, stickerPacksNames []string) ([]strin
 
 type botFileReader struct {
 	bot *telebot.Bot
+}
+
+func newTelegramPoller(
+	timeout time.Duration,
+	history *chathistory.Buffer,
+	log *logger.Logger,
+) *telegram.Poller {
+	return telegram.NewPoller(timeout, on_reaction.New(history), log)
 }
 
 func (r *botFileReader) ReadFile(file *telebot.File) (io.ReadCloser, error) {

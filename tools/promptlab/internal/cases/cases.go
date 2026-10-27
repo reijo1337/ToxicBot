@@ -81,20 +81,29 @@ func (c Case) DomainHistory() []chathistory.Entry {
 // FromHistory: кейс — каждая запись бота, перед которой не меньше minHistory записей
 // и хотя бы одна реплика человека. Сортировка по времени и ID повторяет генератор.
 func FromHistory(chatID int64, entries []chathistory.Entry, minHistory int) []Case {
-	sorted := make([]chathistory.Entry, len(entries))
-	copy(sorted, entries)
+	sorted := make([]chathistory.Entry, 0, len(entries))
+
+	for _, entry := range entries {
+		if entry.Reaction == nil {
+			sorted = append(sorted, entry)
+		}
+	}
+
 	sort.SliceStable(sorted, func(i, j int) bool {
 		if !sorted[i].Time.Equal(sorted[j].Time) {
 			return sorted[i].Time.Before(sorted[j].Time)
 		}
+
 		return sorted[i].ID < sorted[j].ID
 	})
 
 	var out []Case
+
 	for i, e := range sorted {
 		if !e.FromBot || i < minHistory {
 			continue
 		}
+
 		window := sorted[:i]
 		c := Case{
 			ID:      fmt.Sprintf("%d-%d", chatID, e.ID),
@@ -102,6 +111,7 @@ func FromHistory(chatID int64, entries []chathistory.Entry, minHistory int) []Ca
 			History: make([]Entry, 0, len(window)),
 			Actual:  e.Text,
 		}
+
 		for _, h := range window {
 			c.History = append(c.History, Entry{
 				ID:           h.ID,
@@ -114,16 +124,20 @@ func FromHistory(chatID int64, entries []chathistory.Entry, minHistory int) []Ca
 				PreFormatted: h.PreFormatted,
 			})
 		}
+
 		trigger, ok := c.Trigger()
 		if !ok {
 			continue
 		}
+
 		c.Kind = KindText
 		if trigger.PreFormatted && strings.Contains(trigger.Text, "<photo>") {
 			c.Kind = KindPhoto
 		}
+
 		out = append(out, c)
 	}
+
 	return out
 }
 

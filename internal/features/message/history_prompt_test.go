@@ -12,16 +12,31 @@ import (
 
 func TestFormatUserContent_NoReplyTo(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 12, 34, 0, 0, time.UTC)
-	e := chathistory.Entry{ID: 1, Time: t1, Author: "@alice", Text: "hello"}
+	e := chathistory.Entry{
+		ID:     1,
+		Time:   t1,
+		Author: "@alice",
+		Text:   "hello",
+	}
+
 	got := formatUserContent(e, []chathistory.Entry{e}, false)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T12:34">hello</msg>`, got)
+
+	assert.Equal(t, `<msg id="1" from="@alice" time="2026-05-01T12:34">hello</msg>`, got)
 }
 
 func TestFormatUserContent_ReplyToPresent(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 12, 34, 0, 0, time.UTC)
-	target := chathistory.Entry{ID: 1, Time: t1, Author: "@bob", Text: "first"}
+	target := chathistory.Entry{
+		ID:     1,
+		Time:   t1,
+		Author: "@bob",
+		Text:   "first",
+	}
+
 	e := chathistory.Entry{
 		ID:        2,
 		Time:      t1.Add(time.Minute),
@@ -29,26 +44,49 @@ func TestFormatUserContent_ReplyToPresent(t *testing.T) {
 		Text:      "reply",
 		ReplyToID: 1,
 	}
+
 	got := formatUserContent(e, []chathistory.Entry{target, e}, false)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T12:35" reply_to="@bob">reply</msg>`, got)
+
+	assert.Equal(
+		t,
+		`<msg id="2" from="@alice" time="2026-05-01T12:35" reply_to="@bob">reply</msg>`,
+		got,
+	)
 }
 
 func TestFormatUserContent_ReplyToEvicted_NoArrow(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 12, 34, 0, 0, time.UTC)
-	e := chathistory.Entry{ID: 2, Time: t1, Author: "@alice", Text: "reply", ReplyToID: 9999}
+	e := chathistory.Entry{
+		ID:        2,
+		Time:      t1,
+		Author:    "@alice",
+		Text:      "reply",
+		ReplyToID: 9999,
+	}
+
 	got := formatUserContent(e, []chathistory.Entry{e}, false)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T12:34">reply</msg>`, got,
+
+	assert.Equal(t, `<msg id="2" from="@alice" time="2026-05-01T12:34">reply</msg>`, got,
 		"reply_to attribute must be omitted when target ID is not in history")
 }
 
 // spec: GEN-021
 func TestFormatUserContent_NewlineInTextBecomesSpace(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	e := chathistory.Entry{ID: 1, Time: t1, Author: "@alice", Text: "line1\nline2"}
+	e := chathistory.Entry{
+		ID:     1,
+		Time:   t1,
+		Author: "@alice",
+		Text:   "line1\nline2",
+	}
+
 	got := formatUserContent(e, []chathistory.Entry{e}, false)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T00:00">line1 line2</msg>`, got)
+
+	assert.Equal(t, `<msg id="1" from="@alice" time="2026-05-01T00:00">line1 line2</msg>`, got)
 }
 
 // spec: GEN-020
@@ -64,8 +102,15 @@ func TestFormatUserContent_AngleBracketsEscaped(t *testing.T) {
 // spec: GEN-023
 func TestFormatUserContent_ReplyToAttributeQuoteStripped(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	target := chathistory.Entry{ID: 1, Time: t1, Author: `@bob"injected="x`, Text: "first"}
+	target := chathistory.Entry{
+		ID:     1,
+		Time:   t1,
+		Author: `@bob"injected="x`,
+		Text:   "first",
+	}
+
 	e := chathistory.Entry{
 		ID:        2,
 		Time:      t1.Add(time.Minute),
@@ -73,10 +118,12 @@ func TestFormatUserContent_ReplyToAttributeQuoteStripped(t *testing.T) {
 		Text:      "reply",
 		ReplyToID: 1,
 	}
+
 	got := formatUserContent(e, []chathistory.Entry{target, e}, false)
+
 	assert.Equal(
 		t,
-		`<msg from="@alice" time="2026-05-01T00:01" reply_to="@bobinjected=x">reply</msg>`,
+		`<msg id="2" from="@alice" time="2026-05-01T00:01" reply_to="@bobinjected=x">reply</msg>`,
 		got,
 		"double-quotes in resolved reply_to author must be stripped",
 	)
@@ -85,23 +132,40 @@ func TestFormatUserContent_ReplyToAttributeQuoteStripped(t *testing.T) {
 // spec: GEN-022
 func TestFormatUserContent_LongTextTruncated(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	long := strings.Repeat("a", 600)
-	e := chathistory.Entry{ID: 1, Time: t1, Author: "@alice", Text: long}
+	e := chathistory.Entry{
+		ID:     1,
+		Time:   t1,
+		Author: "@alice",
+		Text:   long,
+	}
+
 	got := formatUserContent(e, []chathistory.Entry{e}, false)
-	bodyStart := len(`<msg from="@alice" time="2026-05-01T00:00">`)
+	bodyStart := len(`<msg id="1" from="@alice" time="2026-05-01T00:00">`)
 	bodyEnd := len(got) - len(`</msg>`)
 	body := got[bodyStart:bodyEnd]
+
 	assert.Len(t, []rune(body), maxEntryRunes, "body must be truncated to maxEntryRunes runes")
 }
 
 func TestFormatUserContent_PreFormatted_KeepsTags(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	body := `<photo><caption>nice</caption><vision_description>cat</vision_description></photo>`
-	e := chathistory.Entry{ID: 1, Time: t1, Author: "@alice", Text: body, PreFormatted: true}
+	e := chathistory.Entry{
+		ID:           1,
+		Time:         t1,
+		Author:       "@alice",
+		Text:         body,
+		PreFormatted: true,
+	}
+
 	got := formatUserContent(e, []chathistory.Entry{e}, false)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T00:00">`+body+`</msg>`, got,
+
+	assert.Equal(t, `<msg id="1" from="@alice" time="2026-05-01T00:00">`+body+`</msg>`, got,
 		"PreFormatted=true must skip body sanitization")
 }
 
@@ -117,10 +181,18 @@ func TestFormatUserContent_NotPreFormatted_StillSanitizes(t *testing.T) {
 // spec: GEN-014
 func TestFormatUserContent_TriggerGetsNowAttr(t *testing.T) {
 	t.Parallel()
+
 	t1 := time.Date(2026, 5, 1, 12, 34, 0, 0, time.UTC)
-	e := chathistory.Entry{ID: 1, Time: t1, Author: "@alice", Text: "hello"}
+	e := chathistory.Entry{
+		ID:     1,
+		Time:   t1,
+		Author: "@alice",
+		Text:   "hello",
+	}
+
 	got := formatUserContent(e, []chathistory.Entry{e}, true)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T12:34" now="true">hello</msg>`, got)
+
+	assert.Equal(t, `<msg id="1" from="@alice" time="2026-05-01T12:34" now="true">hello</msg>`, got)
 }
 
 // spec: GEN-014
@@ -140,15 +212,30 @@ func TestBuildChatCompletions_OnlyLastUserMarkedNow(t *testing.T) {
 // spec: GEN-015
 func TestBuildChatCompletions_AssemblyOrderAndSystem(t *testing.T) {
 	t.Parallel()
+
 	system := "BE TOXIC"
 	t1 := time.Date(2026, 5, 1, 14, 32, 0, 0, time.UTC)
 	t2 := t1.Add(2 * time.Minute)
 	history := []chathistory.Entry{
-		{ID: 1, Time: t1, Author: "@alice", Text: "hi", FromBot: false},
-		{ID: 2, Time: t2, Author: "@bob", Text: "yo", ReplyToID: 1, FromBot: false},
+		{
+			ID:      1,
+			Time:    t1,
+			Author:  "@alice",
+			Text:    "hi",
+			FromBot: false,
+		},
+		{
+			ID:        2,
+			Time:      t2,
+			Author:    "@bob",
+			Text:      "yo",
+			ReplyToID: 1,
+			FromBot:   false,
+		},
 	}
 
 	msgs := buildChatCompletions(system, history, replyGeneration)
+
 	require.Len(t, msgs, 3)
 
 	assert.Equal(t, RoleSystem, msgs[0].Role)
@@ -157,13 +244,13 @@ func TestBuildChatCompletions_AssemblyOrderAndSystem(t *testing.T) {
 
 	assert.Equal(t, RoleUser, msgs[1].Role)
 	assert.Equal(t, "@alice", msgs[1].Name)
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T14:32">hi</msg>`, msgs[1].Content)
+	assert.Equal(t, `<msg id="1" from="@alice" time="2026-05-01T14:32">hi</msg>`, msgs[1].Content)
 
 	assert.Equal(t, RoleUser, msgs[2].Role)
 	assert.Equal(t, "@bob", msgs[2].Name)
 	assert.Equal(
 		t,
-		`<msg from="@bob" time="2026-05-01T14:34" reply_to="@alice" now="true">yo</msg>`,
+		`<msg id="2" from="@bob" time="2026-05-01T14:34" reply_to="@alice" now="true">yo</msg>`,
 		msgs[2].Content,
 	)
 }
@@ -197,10 +284,17 @@ func TestBuildChatCompletions_BotEntrySanitizedToAssistant(t *testing.T) {
 // spec: GEN-017
 func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 	t.Parallel()
+
 	system := "S"
 	t1 := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	history := []chathistory.Entry{
-		{ID: 1, Time: t1, Author: "@alice", Text: "first", FromBot: false},
+		{
+			ID:      1,
+			Time:    t1,
+			Author:  "@alice",
+			Text:    "first",
+			FromBot: false,
+		},
 		{
 			ID:        2,
 			Time:      t1.Add(time.Minute),
@@ -220,6 +314,7 @@ func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 	}
 
 	msgs := buildChatCompletions(system, history, replyGeneration)
+
 	require.Len(t, msgs, 4)
 
 	assert.Equal(t, RoleUser, msgs[1].Role)
@@ -234,26 +329,34 @@ func TestBuildChatCompletions_BotReplySetsReplyToTagOnNextUser(t *testing.T) {
 	)
 	assert.Equal(
 		t,
-		`<msg from="@alice" time="2026-05-01T12:02" reply_to="@toxic_bot" now="true">back at you</msg>`,
+		`<msg id="3" from="@alice" time="2026-05-01T12:02" reply_to="@toxic_bot" now="true">back at you</msg>`,
 		msgs[3].Content,
 	)
 }
 
 func TestBuildChatCompletions_SingleUser(t *testing.T) {
 	t.Parallel()
+
 	system := "S"
 	t1 := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
 	history := []chathistory.Entry{
-		{ID: 7, Time: t1, Author: "@solo", Text: "yo"},
+		{
+			ID:     7,
+			Time:   t1,
+			Author: "@solo",
+			Text:   "yo",
+		},
 	}
+
 	msgs := buildChatCompletions(system, history, replyGeneration)
+
 	require.Len(t, msgs, 2)
 	assert.Equal(t, RoleSystem, msgs[0].Role)
 	assert.Equal(t, RoleUser, msgs[1].Role)
 	assert.Equal(t, "@solo", msgs[1].Name)
 	assert.Equal(
 		t,
-		`<msg from="@solo" time="2026-05-01T09:00" now="true">yo</msg>`,
+		`<msg id="7" from="@solo" time="2026-05-01T09:00" now="true">yo</msg>`,
 		msgs[1].Content,
 	)
 }
@@ -261,6 +364,7 @@ func TestBuildChatCompletions_SingleUser(t *testing.T) {
 // spec: GEN-018
 func TestBuildChatCompletions_OutOfOrderEntriesSortedByTime(t *testing.T) {
 	t.Parallel()
+
 	system := "S"
 	t1 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Minute)
@@ -269,19 +373,42 @@ func TestBuildChatCompletions_OutOfOrderEntriesSortedByTime(t *testing.T) {
 	// telebot (Synchronous=false) и отложенный AddAll после медленного LLM-вызова
 	// могут перемежаться, так что более ранние сообщения поступают позже.
 	history := []chathistory.Entry{
-		{ID: 3, Time: t3, Author: "@carol", Text: "third", FromBot: false},
-		{ID: 1, Time: t1, Author: "@alice", Text: "first", FromBot: false},
-		{ID: 2, Time: t2, Author: "@bob", Text: "second", FromBot: false},
+		{
+			ID:      3,
+			Time:    t3,
+			Author:  "@carol",
+			Text:    "third",
+			FromBot: false,
+		},
+		{
+			ID:      1,
+			Time:    t1,
+			Author:  "@alice",
+			Text:    "first",
+			FromBot: false,
+		},
+		{
+			ID:      2,
+			Time:    t2,
+			Author:  "@bob",
+			Text:    "second",
+			FromBot: false,
+		},
 	}
 
 	msgs := buildChatCompletions(system, history, replyGeneration)
+
 	require.Len(t, msgs, 4)
 
-	assert.Equal(t, `<msg from="@alice" time="2026-05-01T10:00">first</msg>`, msgs[1].Content)
-	assert.Equal(t, `<msg from="@bob" time="2026-05-01T10:01">second</msg>`, msgs[2].Content)
 	assert.Equal(
 		t,
-		`<msg from="@carol" time="2026-05-01T10:02" now="true">third</msg>`,
+		`<msg id="1" from="@alice" time="2026-05-01T10:00">first</msg>`,
+		msgs[1].Content,
+	)
+	assert.Equal(t, `<msg id="2" from="@bob" time="2026-05-01T10:01">second</msg>`, msgs[2].Content)
+	assert.Equal(
+		t,
+		`<msg id="3" from="@carol" time="2026-05-01T10:02" now="true">third</msg>`,
 		msgs[3].Content,
 	)
 }

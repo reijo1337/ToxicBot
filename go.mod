@@ -20,7 +20,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/text v0.42.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20230915040305-7677e8164883
-	gopkg.in/telebot.v3 v3.2.1
+	gopkg.in/telebot.v3 v3.3.8
 	gopkg.in/yaml.v3 v3.0.1
 )
 

@@ -189,3 +189,66 @@ func TestLoadLegacyTextPhoto(t *testing.T) {
 	assert.Zero(t, cs[0].DomainHistory()[0].SenderID)
 	assert.True(t, cs[1].DomainHistory()[0].PreFormatted)
 }
+
+func TestFromHistory_ReactionsDoNotBecomeTriggersOrCountTowardMinimum(t *testing.T) {
+	t.Parallel()
+
+	entries := []chathistory.Entry{
+		{
+			ID:           1,
+			Time:         at(0),
+			Author:       alice,
+			Text:         "<photo></photo>",
+			PreFormatted: true,
+		},
+		{
+			Time: at(1),
+			Reaction: &chathistory.Reaction{
+				UpdateID:  10,
+				MessageID: 1,
+			},
+		},
+		{
+			ID:      2,
+			Time:    at(2),
+			Author:  bot,
+			Text:    "reply",
+			FromBot: true,
+		},
+	}
+
+	cs := FromHistory(1, entries, 1)
+
+	require.Len(t, cs, 1)
+	require.Len(t, cs[0].History, 1)
+
+	trigger, ok := cs[0].Trigger()
+
+	require.True(t, ok)
+	assert.Equal(t, 1, trigger.ID)
+	assert.Equal(t, KindPhoto, cs[0].Kind)
+	assert.Empty(t, FromHistory(1, entries, 2))
+	assert.NotNil(t, entries[1].Reaction, "extraction must not mutate input")
+}
+
+func TestFromHistory_ReactionOnlyWindowDoesNotBecomeCase(t *testing.T) {
+	t.Parallel()
+
+	entries := []chathistory.Entry{
+		{
+			Time: at(0),
+			Reaction: &chathistory.Reaction{
+				UpdateID:  10,
+				MessageID: 1,
+			},
+		},
+		{
+			ID:      2,
+			Time:    at(1),
+			Text:    "reply",
+			FromBot: true,
+		},
+	}
+
+	assert.Empty(t, FromHistory(1, entries, 1))
+}

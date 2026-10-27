@@ -16,6 +16,7 @@ const archiveDir = "archive"
 
 // Change — активное (незаархивированное) предложение изменения.
 type Change struct {
+	DeltaSpecs   map[string][]spec.Scenario
 	ID           string
 	Dir          string
 	Capabilities []string
@@ -36,6 +37,7 @@ func Active(root string) ([]Change, error) {
 	}
 
 	var out []Change
+	scenarioOwners := make(map[string]string)
 
 	for _, e := range entries {
 		if !e.IsDir() || e.Name() == archiveDir {
@@ -49,15 +51,46 @@ func Active(root string) ([]Change, error) {
 			return nil, capErr
 		}
 
-		scenarios, scErr := deltaScenarios(dir, caps)
+		deltas, scErr := deltaScenarios(dir, caps)
 		if scErr != nil {
 			return nil, scErr
 		}
 
-		out = append(out, Change{ID: e.Name(), Dir: dir, Capabilities: caps, Scenarios: scenarios})
+		var scenarios []string
+
+		for _, parsed := range deltas {
+			for _, s := range parsed {
+				scenarios = append(scenarios, s.ID)
+			}
+		}
+
+		sort.Strings(scenarios)
+
+		for _, id := range scenarios {
+			if owner, exists := scenarioOwners[id]; exists {
+				return nil, fmt.Errorf(
+					"сценарий %s повторяется в changes %s и %s",
+					id,
+					owner,
+					e.Name(),
+				)
+			}
+
+			scenarioOwners[id] = e.Name()
+		}
+
+		out = append(out, Change{
+			ID:           e.Name(),
+			Dir:          dir,
+			Capabilities: caps,
+			Scenarios:    scenarios,
+			DeltaSpecs:   deltas,
+		})
 	}
 
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].ID < out[j].ID
+	})
 
 	return out, nil
 }
@@ -95,9 +128,9 @@ func deltaCapabilities(changeDir string) ([]string, error) {
 	return out, nil
 }
 
-// deltaScenarios собирает идентификаторы сценариев из дельт перечисленных capability.
-func deltaScenarios(changeDir string, caps []string) ([]string, error) {
-	var out []string
+// deltaScenarios сохраняет принадлежность сценариев к capability из пути дельты.
+func deltaScenarios(changeDir string, caps []string) (map[string][]spec.Scenario, error) {
+	out := make(map[string][]spec.Scenario, len(caps))
 
 	for _, c := range caps {
 		parsed, err := spec.ParseFile(filepath.Join(changeDir, "specs", c, "spec.md"))
@@ -105,14 +138,23 @@ func deltaScenarios(changeDir string, caps []string) ([]string, error) {
 			return nil, err
 		}
 
-		for _, s := range parsed {
-			out = append(out, s.ID)
+		out[c] = parsed
+	}
+
+	return out, nil
+}
+
+// PendingSpecs объединяет сценарии активных дельт по имени capability.
+func PendingSpecs(list []Change) map[string][]spec.Scenario {
+	out := make(map[string][]spec.Scenario)
+
+	for _, c := range list {
+		for name, scenarios := range c.DeltaSpecs {
+			out[name] = append(out[name], scenarios...)
 		}
 	}
 
-	sort.Strings(out)
-
-	return out, nil
+	return out
 }
 
 // PendingScenarios собирает сценарии из дельт всех активных changes.
