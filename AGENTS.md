@@ -36,11 +36,13 @@ internal/
     on_user_join/                        — new member greeting handler
     on_user_left/                        — member leave reaction handler
     on_photo/                            — photo reaction handler
+    on_reaction/                         — персональные изменения реакций Telegram в историю, без ответа
     personal/                            — per-user reactions (Igor, Max, Kirill)
     tagger/                              — periodic random user tagger
     settings/                            — /settings command
     stat/                                — /stat command
   infrastructure/
+    telegram/                            — единственный polling-поток обычных апдейтов и message_reaction
     ai/deepseek/                         — DeepSeek LLM client
     ai/gigachat/                         — GigaChat LLM client
     sheets/google_spreadsheet/           — Google Sheets data source
@@ -70,6 +72,38 @@ Reacts to voice messages with probability `voice_chance`. Sends a voice message 
 ### Photo Reactions (`internal/handlers/on_photo/`)
 
 Reacts to photos with probability `photo_chance`.
+
+### Message Reaction Events (`internal/handlers/on_reaction/`)
+
+Получает новые персональные `message_reaction` через общий poller в
+`internal/infrastructure/telegram`. Для доставки бот должен быть администратором чата;
+тип обновления запрашивается явно. События `actor_chat`, анонимные счётчики, боты и
+апдейты без достоверного пользователя или цели пропускаются. Добавления и снятия
+определяются разностью наборов; замена — одно событие. Поддерживаются emoji,
+custom emoji по ID и paid; неизвестные типы пропускаются.
+
+Используется telebot v3.3.8 со штатными типами реакций. Его HTTP-клиент подключается вместе
+с poller: только `getUpdates` дополнительно привязан к контексту polling, чтобы обходить
+потерю сигнала stopClient в SDK при остановке. Не заменять эту пару одним штатным LongPoller:
+нужны подтверждение записи до продвижения offset и прерываемые повторные ожидания.
+
+Событие занимает одно место в общем окне 100 записей истории и сохраняется в прежнем
+gob blob SQLite без миграции. Повторный update ID не дублируется, пока есть в окне,
+в том числе после рестарта. Ошибка первоначального чтения истории задерживает
+приём этого апдейта и остатка пачки максимум на три попытки с паузами 1 и 2 секунды.
+Затем событие пропускается с Error (причина, ID апдейта и чата), offset продвигается,
+приём остальных апдейтов продолжается; непрочитанный blob не перезаписывается.
+Прошлые реакции и неизвестные сообщения из Telegram не восстанавливаются.
+
+Реакция не вызывает ответ, LLM, cooldown, статистику или регистрацию участника теггера.
+Её автор хранится отдельно от `SenderID` написанной реплики и не получает допуска к пингу
+за одну реакцию. В промптах события отделены от сообщений, у пинга — блок `chat_reactions`;
+реакция не подменяет текущую реплику и не переносит слова цели на автора действия.
+
+Перед первым развёртыванием нужна совместимая резервная копия SQLite. Для отката старой
+версии требуется восстановить копию до появления реакций: старый gob-декодер оставит
+вместо событий пустые реплики. Восстановление теряет записи после копии. Процедура
+проверки и фиксация результата — в `deploy/message-reactions.md` (сохраняется после архивации change).
 
 ### User Join/Leave
 
@@ -117,7 +151,7 @@ Live в `internal/features/message/`. Две стратегии:
 LLM-клиенты подключаются в `cmd/main.go` (DeepSeek + GigaChat). Клиент DeepSeek построен на официальном SDK `github.com/openai/openai-go/v3` через переопределённый `BaseURL`. У генератора два метода:
 
 - `GetMessageText(replyTo, aiChance)` — одиночная реплика без контекста.
-- `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory кеш размером 100 сообщений, lazy-load из SQLite-таблицы `chat_history` при первом обращении к chatID; см. `cmd/main.go:118`).
+- `GetMessageTextWithHistory(history, aiChance)` — генерация с учётом истории чата из `chathistory.Buffer` (in-memory кеш размером 100 записей, включая события реакций, lazy-load из SQLite-таблицы `chat_history` при первом обращении к chatID).
 
 Ответ LLM прогоняется через `sanitize.go` (фильтрация артефактов) и `phrase_filter` (проверка на осмысленность).
 

@@ -149,7 +149,12 @@ func dispatch(ctx context.Context, command string, e env) error {
 func load(root string) (env, error) {
 	specsDir := filepath.Join(root, "openspec", "specs")
 
-	caps, err := spec.LoadAll(specsDir)
+	active, err := changes.Active(filepath.Join(root, "openspec", "changes"))
+	if err != nil {
+		return env{}, err
+	}
+
+	caps, err := spec.LoadAllWithDeltas(specsDir, changes.PendingSpecs(active))
 	if err != nil {
 		return env{}, err
 	}
@@ -159,17 +164,18 @@ func load(root string) (env, error) {
 		return env{}, err
 	}
 
-	active, err := changes.Active(filepath.Join(root, "openspec", "changes"))
-	if err != nil {
-		return env{}, err
-	}
-
 	cfg, err := conf.Load(filepath.Join(root, "openspec", "specctl.yaml"))
 	if err != nil {
 		return env{}, err
 	}
 
-	return env{root: root, caps: caps, anchors: found, active: active, cfg: cfg}, nil
+	return env{
+		root:    root,
+		caps:    caps,
+		anchors: found,
+		active:  active,
+		cfg:     cfg,
+	}, nil
 }
 
 // emit печатает находки и возвращает ошибку, если среди них есть блокирующие.

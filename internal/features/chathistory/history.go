@@ -2,6 +2,7 @@ package chathistory
 
 import (
 	"context"
+	"slices"
 	"sync"
 )
 
@@ -58,7 +59,34 @@ func (b *Buffer) Add(chatID int64, e Entry) {
 
 	b.ensureLoadedLocked(chatID)
 	b.appendLocked(chatID, e)
-	b.persistLocked(chatID)
+	b.persistLocked(context.Background(), chatID)
+}
+
+func (b *Buffer) AddReaction(ctx context.Context, chatID int64, e Entry) error {
+	if e.Reaction == nil {
+		return nil
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if err := b.loadLocked(ctx, chatID); err != nil {
+		return err
+	}
+
+	for _, entry := range b.data[chatID] {
+		if entry.Reaction != nil && entry.Reaction.UpdateID == e.Reaction.UpdateID {
+			return nil
+		}
+	}
+
+	e = cloneEntry(e)
+	reaction := e.Reaction.ResolveTarget(b.data[chatID])
+	e.Reaction = &reaction
+	b.appendLocked(chatID, e)
+	b.persistLocked(ctx, chatID)
+
+	return nil
 }
 
 // AddAll appends multiple entries under a single lock, so no concurrent Add
@@ -68,14 +96,17 @@ func (b *Buffer) AddAll(chatID int64, entries ...Entry) {
 	if len(entries) == 0 {
 		return
 	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	b.ensureLoadedLocked(chatID)
+
 	for _, e := range entries {
 		b.appendLocked(chatID, e)
 	}
-	b.persistLocked(chatID)
+
+	b.persistLocked(context.Background(), chatID)
 }
 
 func (b *Buffer) Get(chatID int64) []Entry {
@@ -84,50 +115,76 @@ func (b *Buffer) Get(chatID int64) []Entry {
 
 	b.ensureLoadedLocked(chatID)
 
-	src := b.data[chatID]
-	out := make([]Entry, len(src))
-	copy(out, src)
-	return out
+	return cloneEntries(b.data[chatID])
 }
 
 func (b *Buffer) appendLocked(chatID int64, e Entry) {
 	buf := b.data[chatID]
-	buf = append(buf, e)
+	buf = append(buf, cloneEntry(e))
 	if len(buf) > b.maxSize {
 		buf = buf[len(buf)-b.maxSize:]
 	}
+
 	b.data[chatID] = buf
 }
 
 func (b *Buffer) ensureLoadedLocked(chatID int64) {
+	ctx := context.Background()
+	if err := b.loadLocked(ctx, chatID); err != nil {
+		b.log.Warn(b.log.WithError(ctx, err), "chathistory: failed to load history")
+	}
+}
+
+func (b *Buffer) loadLocked(ctx context.Context, chatID int64) error {
 	if b.loaded[chatID] {
-		return
+		return nil
 	}
 
-	ctx := context.Background()
 	entries, err := b.store.Load(ctx, chatID)
 	if err != nil {
-		// Don't mark as loaded — let the next call retry.
-		// Otherwise a transient error would silently overwrite persisted history.
-		b.log.Warn(b.log.WithError(ctx, err), "chathistory: failed to load history")
-		return
+		return err
 	}
+
 	b.loaded[chatID] = true
 
 	if len(entries) == 0 {
-		return
+		return nil
 	}
+
 	if len(entries) > b.maxSize {
 		entries = entries[len(entries)-b.maxSize:]
 	}
-	b.data[chatID] = entries
+
+	b.data[chatID] = cloneEntries(entries)
+
+	return nil
 }
 
-func (b *Buffer) persistLocked(chatID int64) {
-	ctx := context.Background()
-	if err := b.store.Save(ctx, chatID, b.data[chatID]); err != nil {
+func (b *Buffer) persistLocked(ctx context.Context, chatID int64) {
+	if err := b.store.Save(ctx, chatID, cloneEntries(b.data[chatID])); err != nil {
 		b.log.Warn(b.log.WithError(ctx, err), "chathistory: failed to save history")
 	}
+}
+
+func cloneEntries(entries []Entry) []Entry {
+	cloned := make([]Entry, len(entries))
+
+	for i, entry := range entries {
+		cloned[i] = cloneEntry(entry)
+	}
+
+	return cloned
+}
+
+func cloneEntry(entry Entry) Entry {
+	if entry.Reaction != nil {
+		reaction := *entry.Reaction
+		reaction.Added = slices.Clone(reaction.Added)
+		reaction.Removed = slices.Clone(reaction.Removed)
+		entry.Reaction = &reaction
+	}
+
+	return entry
 }
 
 type noopStore struct{}

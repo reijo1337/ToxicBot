@@ -76,8 +76,9 @@ func (h *Handler) takeDue(now time.Time) (tagAttempt, bool) {
 // selectTarget связывает одного уникального автора снимка с актуальной задачей и эпохой.
 func (h *Handler) selectTarget(job taggerJob, history []chathistory.Entry) (tagAttempt, bool) {
 	authors := make(map[int64]struct{}, len(history))
+
 	for _, entry := range history {
-		if !entry.FromBot && entry.SenderID > 0 {
+		if entry.Reaction == nil && !entry.FromBot && entry.SenderID > 0 {
 			authors[entry.SenderID] = struct{}{}
 		}
 	}
@@ -87,16 +88,20 @@ func (h *Handler) selectTarget(job taggerJob, history []chathistory.Entry) (tagA
 	if !h.jobCurrentLocked(job) {
 		return tagAttempt{}, false
 	}
+
 	users := h.users.Users(job.chatID)
 	eligible := make([]int64, 0, len(users))
+
 	for _, id := range users {
 		if _, ok := authors[id]; ok {
 			eligible = append(eligible, id)
 		}
 	}
+
 	if len(eligible) == 0 {
 		return tagAttempt{}, false
 	}
+
 	return tagAttempt{
 		job:    job,
 		userID: eligible[h.random.Intn(len(eligible))],

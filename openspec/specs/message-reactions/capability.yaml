@@ -1,0 +1,25 @@
+prefix: REACT
+
+owns:
+  - internal/handlers/on_reaction
+  - internal/infrastructure/telegram
+
+scenarios:
+  REACT-001: covered
+  REACT-002: covered
+  REACT-003: covered
+  REACT-004: covered
+  REACT-005: covered
+  REACT-006: covered
+  REACT-007: covered
+  REACT-008: covered
+  REACT-009: covered
+  REACT-010: manual
+  REACT-011: covered
+  REACT-012: covered
+
+notes:
+  REACT-010: >-
+    Требуется живой Telegram и бот-администратор тестовой группы. Процедура и место
+    для результата: deploy/message-reactions.md.
+    Результат пока не получен, ручная проверка остаётся открытой.
